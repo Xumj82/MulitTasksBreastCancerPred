@@ -1,0 +1,33 @@
+BASE: ['ddsm_base.yaml']
+MODEL:
+  blocks:
+    encoder:
+      name: swin_transformer
+      pretrained: 'pretrained/swin_base_patch4_window7_224_22k.pth'
+      weights: NULL
+      args:
+        freeze: True
+        drop_path_rate: 0.2
+        embed_dim: 128
+        depths: [ 2, 2, 18, 2 ]
+        num_heads: [ 4, 8, 16, 32 ]
+        num_classes: 5
+        window_size: 7
+        use-checkpoint: True
+      optimizer: SGD
+      scheduler: step
+      learning_rate: 0.02
+      lr_decay_rate: 0.01
+      lr_decay_steps: 5
+      weight_decay: 0.0001
+      beta1: 0.9
+    decoder:
+      name: empty_header
+      pretrained: NULL
+      weights: NULL
+  losses:
+    lesion: crossentropy
+  loss_scale: 
+    lesion: 1
+  metrics: 
+    lesion: f1score

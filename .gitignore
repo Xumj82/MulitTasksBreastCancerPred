@@ -1,0 +1,13 @@
+/__pycache__
+/logs
+/.vscode
+/data/csv
+/data/mdb
+/data/__pycache__
+/metrics/__pycache__
+/model/__pycache__
+/preprocess/__pycache__
+/pretrained
+/lib/__pycache__
+/asset/upload_one
+staticis.txt
