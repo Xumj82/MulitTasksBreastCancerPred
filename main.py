@@ -54,8 +54,8 @@ def load_callbacks(cfg):
     #     min_delta=0.001
     # ))
     callbacks.append(plc.ModelCheckpoint(
-        monitor=cfg['acc_monitor'],
-        filename='best-{epoch:02d}-{'+cfg['acc_monitor']+':.3f}',
+        monitor='val_'+cfg['acc_monitor']+'_acc',
+        filename='best-{epoch:02d}-{'+'val_'+cfg['acc_monitor']+'_acc'+':.3f}',
         save_top_k=1,
         mode='max',
         save_last=True

@@ -1,5 +1,6 @@
 import json
 import os
+from turtle import st
 
 
 import cv2
@@ -9,7 +10,6 @@ import os.path as op
 import numpy as np
 import pandas as pd
 import torch
-import elasticdeform
 from torchvision import transforms
 
 import torch.utils.data as data
@@ -17,17 +17,20 @@ import torch.utils.data as data
 from torchvision import transforms
 from sklearn.model_selection import train_test_split
 
-class SegemData(data.Dataset):
+class DdsmData(data.Dataset):
     def __init__(self, 
                 data_dir,
                 stage = 'fit',
-                crop_size = (1152,896),
-                crop_weight = (0.6, 0.3, 0.1),
-                num_class = 3,
+                crop_size = 224,
+                crop_weight = [0.9, 0.1, 0],
+                num_classes = 3,
+                positive_thr = 0.75,
+                elastic_param = 12,
                 train=True,
                 aug_prob=0.5,
                 img_mean=(0.485),
                 img_std=(0.229),
+                repeat_channel = True
                 ):
         # self.__dict__.update(locals())
         self.train = train
@@ -41,8 +44,11 @@ class SegemData(data.Dataset):
             self.csv_file = data_dir+'/test_meta.csv'
         self.crop_size = crop_size
         self.crop_weight = crop_weight
+        self.positive_thr = positive_thr
+        self.elastic_param = elastic_param
         self.aug_prob = aug_prob
-        self.num_class = num_class
+        self.num_classes = num_classes
+        self.repeat_channel = repeat_channel
         self.check_files()
 
     def check_files(self):
@@ -58,33 +64,23 @@ class SegemData(data.Dataset):
         else:
             self.data_list = df
 
-    def visualize(self):
-        fontsize = 18
-        
-        if original_image is None and original_mask is None:
-            f, ax = plt.subplots(2, 1, figsize=(8, 8))
-
-            ax[0].imshow(image)
-            ax[1].imshow(mask)
-        else:
-            f, ax = plt.subplots(2, 2, figsize=(8, 8))
-
-            ax[0, 0].imshow(original_image)
-            ax[0, 0].set_title('Original image', fontsize=fontsize)
-            
-            ax[1, 0].imshow(original_mask)
-            ax[1, 0].set_title('Original mask', fontsize=fontsize)
-            
-            ax[0, 1].imshow(image)
-            ax[0, 1].set_title('Transformed image', fontsize=fontsize)
-            
-            ax[1, 1].imshow(mask)
-            ax[1, 1].set_title('Transformed mask', fontsize=fontsize)
-
     def random_choose_crop_point(self, img, ann):
         masked_indexes = np.argwhere(ann > 0)
         breast_indexes = np.argwhere(img > 0)
         black_indexes = np.argwhere(img > -1)
+
+        index = np.random.choice(3,1, p=self.crop_weight)
+        if index == 0 :
+            point = masked_indexes[np.random.randint(len(masked_indexes))]
+        if index == 1 :
+            point = breast_indexes[np.random.randint(len(breast_indexes))]
+        if index == 2 :
+            point = black_indexes[np.random.randint(len(black_indexes))]
+
+        point = [max(self.crop_size,min(img.shape[0]-self.crop_size, point[0])) ,max(self.crop_size,min(img.shape[1]-self.crop_size, point[1]))  ]
+        
+        return point
+
 
     def __getitem__(self, index):
         
@@ -96,67 +92,71 @@ class SegemData(data.Dataset):
         else:
             img = cv2.imread(os.path.join(self.data_dir,'img_dir/test',self.data_list.iloc[index]['img_id']+'.png'),cv2.IMREAD_ANYDEPTH)         
             ann = cv2.imread(os.path.join(self.data_dir,'ann_dir/test',self.data_list.iloc[index]['img_id']+'.png'),cv2.IMREAD_GRAYSCALE)
-        
-        max_class_labels = np.unique(ann)
+        crop_point = self.random_choose_crop_point(img, ann)
+
+        class_labels = []
         masks = []
-        for label in max_class_labels:
+        for label in np.unique(ann):
             if label:
                 zeros = np.zeros(ann.shape)
                 mask = np.where(ann==label,1,zeros)
                 masks.append(mask)
+                class_labels.append(label)
                 
-        # ann = np.where(ann > 4,0,ann)
+        aug = A.Compose([
+            A.ToFloat(max_value=65535.0),
+            A.Normalize(mean=self.img_mean, std=self.img_std),
+            A.Crop(x_min=crop_point[1]-self.crop_size//2, 
+            y_min=crop_point[0]-self.crop_size//2, 
+            x_max=crop_point[1]+self.crop_size//2, 
+            y_max=crop_point[0]+self.crop_size//2, 
+            p=1),
+            A.VerticalFlip(p=self.aug_prob),              
+            A.RandomRotate90(p=self.aug_prob),
+            A.ElasticTransform(alpha=self.elastic_param, sigma=self.elastic_param * 0.05, alpha_affine=self.elastic_param * 0.03, p=self.aug_prob),
+            
+            ]
+        ) if self.train else A.Compose([
+            A.ToFloat(max_value=65535.0),
+            A.Normalize(mean=self.img_mean, std=self.img_std),
+            A.Crop(x_min=crop_point[1]-self.crop_size//2, 
+            y_min=crop_point[0]-self.crop_size//2, 
+            x_max=crop_point[1]+self.crop_size//2, 
+            y_max=crop_point[0]+self.crop_size//2, 
+            p=1)
+        ])
 
 
-        # ann = np.where(ann>0, 1, 0)
-        # pathology_label = 1 if  self.data_list.iloc[index]['pathology'] else 0
+        augmented = aug(image=img, masks=masks)
+        image_auged = augmented['image']
+        masks_auged = augmented['masks']
+        mask_auged = np.zeros([self.crop_size, self.crop_size])
 
-        # if self.classes == 3:
-        #     ann = np.where(ann == 1*50, 1, ann)
-        #     ann = np.where(ann == 2*50, 2, ann)
-        #     ann = np.where(ann == 3*50, 1, ann)
-        #     ann = np.where(ann == 4*50, 2, ann)
-        if self.aug:
-            # if  self.train and self.elasticdeform:
-            #     aug_imgs = elasticdeform.deform_random_grid(np.concatenate(img, masks) ,sigma=15, points=3,axis=(0,1),)
-
+        pathology = 0
+        for label, mask in zip(class_labels, masks_auged):
+            if np.sum(mask) > self.positive_thr * self.crop_size**2:
+                pathology = label
+                break
         
-            img = torch.unsqueeze(torch.tensor(img/65535),0).float()
-            ann = torch.unsqueeze(torch.tensor(ann),0).long()
+        for label, mask in zip(class_labels, masks_auged):
+            mask_auged = np.where(mask>0,label,0)
 
-            aug = A.Compose([
-                A.VerticalFlip(p=self.aug),              
-                A.RandomRotate90(p=self.aug),
-                A.ElasticTransform(alpha=120, sigma=120 * 0.05, alpha_affine=120 * 0.03, p=self.aug)
-                ]
-            )
-
-            trans = torch.nn.Sequential(
-                # transforms.Resize((512,512)),
-                transforms.RandomHorizontalFlip(self.aug_prob),
-                transforms.RandomVerticalFlip(self.aug_prob),
-                transforms.RandomRotation(10),
-                # transforms.Normalize(self.img_mean, self.img_std)
-            ) if self.train else torch.nn.Sequential(
-                # transforms.Resize((512,512)),
-                # transforms.Normalize(self.img_mean, self.img_std)
-            )
-
-            trans_nor = torch.nn.Sequential(transforms.Normalize(self.img_mean, self.img_std))
-            img_cat = torch.cat((img, ann))
-            img_cat_tensor = trans(img_cat)
-
-            img_tensor = trans_nor(torch.unsqueeze(img_cat_tensor[0],0))
-            ann_tensor = img_cat_tensor[1].long()
+        if self.repeat_channel:
+            image_tensor =torch.unsqueeze(torch.tensor(image_auged),0).repeat(3,1,1)
         else:
-            img_tensor = torch.unsqueeze(torch.tensor(img.astype(np.int32)),0).float()
-            ann_tensor = torch.unsqueeze(torch.tensor(ann),0).long()
+            image_tensor =torch.unsqueeze(torch.tensor(image_auged),0)
 
-        pathology_tensor = torch.tensor(pathology_label).long()
+        if self.num_classes == 3:
+            if pathology == 3:
+                pathology = 1
+            if pathology == 4:
+                pathology = 2
+
         output = dict(
-            input=img_tensor,
-            seg_lesion=ann_tensor,
-            pathology=pathology_tensor,
+            input=image_tensor,
+            seg_lesion=torch.unsqueeze(torch.tensor(mask_auged),0),
+            lesion=torch.tensor(pathology).long(),
+            # crop_point = torch.tensor(crop_point)
         )
         return output
 

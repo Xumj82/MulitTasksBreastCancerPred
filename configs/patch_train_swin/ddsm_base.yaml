@@ -1,19 +1,9 @@
 SEED: 32
 MODE: Train
-DATA:
-  dataset: patch_data
-  num_workers: 6
-  batch_size: 32
-  class_num: 5
-  data_dir: /home/xumingjie/Desktop/DDSM_DATA/patch_set/
-  aug_prob: 0.5
-  img_mean: [0.485]
-  img_std: [0.229]
-  repeat_channel: True
 TRAIN:
   Trainer:
     accelerator: gpu
-    devices: [1]
+    devices: [0]
     max_epochs: 100
   acc_monitor: lesion
   load_dir:
