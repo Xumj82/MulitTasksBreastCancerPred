@@ -4,7 +4,6 @@ from pathlib import Path
 
 import cv2
 import torch
-import lmdb
 import pydicom
 import numpy as np
 import pandas as pd
