@@ -1,13 +1,11 @@
 BASE: ['ddsm_base.yaml']
 DATA:
-  dataset: ddsm_data
-  num_workers: 4
-  batch_size: 12
+  dataset: patch_data
+  num_workers: 1
+  batch_size: 32
   class_num: 5
-  crop_weight: [0.7,0.2,0.1]
-  positive_thr: 0.05
   elastic_param: 500
-  data_dir: /home/xumj/ddsm_set
+  data_dir: /home/xumingjie/Desktop/DDSM_DATA/patch_set/
   aug_prob: 0.5
   img_mean: [0.485]
   img_std: [0.229]
@@ -15,27 +13,15 @@ DATA:
 MODEL:
   blocks:
     encoder:
-      name: swin_mmseg
+      name: swin_transformer
       pretrained: NULL
       weights: NULL
       args:
-        pretrained: '/home/xumj/Pretrained_models/swin_tiny_patch4_window7_224_20220317-1cdeb081.pth'
-        pretrain_img_size: 224
-        embed_dims: 96
-        patch_size: 4
+        pretrained: 'logs/patch_train_swin/version_0/checkpoints/best-epoch=66-lesion=0.926.ckpt'
+        embed_dim: 128
         window_size: 7
-        mlp_ratio: 4
-        depths: [2, 2, 6, 2]
-        num_heads: [3, 6, 12, 24]
-        strides: [4, 2, 2, 2]
-        out_indices: [3]
-        qkv_bias: True
-        qk_scale: NULL
-        patch_norm: True
-        drop_rate: 0
-        attn_drop_rate: 0
-        drop_path_rate: 0.3
-        use_abs_pos_embed: False
+        depths: [ 2, 2, 18, 2 ]
+        num_heads: [ 4, 8, 16, 32 ]
       optimizer: SGD
       scheduler: step
       learning_rate: 0.0001
@@ -44,13 +30,11 @@ MODEL:
       weight_decay: 0.0001
       beta1: 0.9
     decoder:
-      name: mlp
+      name: empty_header
       pretrained: NULL
       weights: NULL
-      args:
-        num_classes: 5
   losses:
-    lesion: focal
+    lesion: crossentropy
   loss_scale: 
     lesion: 1
   metrics: 
