@@ -111,6 +111,6 @@ class PatchData(data.Dataset):
         return output
 
     def __len__(self):
-        return 10
+        # return 10
         return len(self.data_list)  # It's a fake length due to the trick that every loader maintains its own list
         # return self.num_sampleclass
