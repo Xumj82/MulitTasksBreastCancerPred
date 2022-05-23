@@ -4,9 +4,9 @@ from torch import nn
 import torch.nn.functional as F
 from mmcv.runner import BaseModule
 class Mlp(BaseModule):
-    def __init__(self,num_classes=3,fc_dim=768,freeze=False,pretrained=None):
+    def __init__(self,num_classes=3,in_channel=768,freeze=False,pretrained=None):
         super().__init__()
-        self.fc = nn.Linear(fc_dim, num_classes)
+        self.fc = nn.Linear(in_channel, num_classes)
 
         if pretrained is not None:
             self.init_cfg = dict(type='Pretrained', checkpoint=pretrained)

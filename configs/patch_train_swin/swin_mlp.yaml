@@ -1,13 +1,13 @@
 BASE: ['ddsm_base.yaml']
 DATA:
   dataset: ddsm_data
-  num_workers: 4
-  batch_size: 12
+  num_workers: 6
+  batch_size: 32
   class_num: 5
   crop_weight: [0.7,0.2,0.1]
   positive_thr: 0.05
   elastic_param: 500
-  data_dir: /home/xumj/ddsm_set
+  data_dir: /root/autodl-tmp/ddsm_set
   aug_prob: 0.5
   img_mean: [0.485]
   img_std: [0.229]
@@ -19,14 +19,14 @@ MODEL:
       pretrained: NULL
       weights: NULL
       args:
-        pretrained: '/home/xumj/Pretrained_models/swin_tiny_patch4_window7_224_20220317-1cdeb081.pth'
+        pretrained: '/root/swin_base_patch4_window7_224_20220317-e9b98025.pth'
         pretrain_img_size: 224
-        embed_dims: 96
+        embed_dims: 128
         patch_size: 4
         window_size: 7
         mlp_ratio: 4
-        depths: [2, 2, 6, 2]
-        num_heads: [3, 6, 12, 24]
+        depths: [2, 2, 18, 2]
+        num_heads: [4, 8, 16, 32]
         strides: [4, 2, 2, 2]
         out_indices: [3]
         qkv_bias: True
@@ -39,8 +39,8 @@ MODEL:
       optimizer: SGD
       scheduler: step
       learning_rate: 0.0001
-      lr_decay_rate: 0.01
-      lr_decay_steps: 5
+      lr_decay_rate: 0.5
+      lr_decay_steps: 50
       weight_decay: 0.0001
       beta1: 0.9
     decoder:
@@ -49,9 +49,10 @@ MODEL:
       weights: NULL
       args:
         num_classes: 5
+        in_channel: 1024
   losses:
     lesion: focal
   loss_scale: 
-    lesion: 1
+    lesion: 10
   metrics: 
     lesion: f1score
