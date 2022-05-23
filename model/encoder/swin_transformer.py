@@ -7,9 +7,15 @@
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+from collections import OrderedDict
 import torch.utils.checkpoint as checkpoint
-from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 
+from mmcv.cnn.utils.weight_init import (constant_init, trunc_normal_,
+                                        trunc_normal_init)
+from timm.models.layers import DropPath, to_2tuple, trunc_normal_
+from mmcv.runner import (BaseModule, CheckpointLoader, ModuleList,
+                         load_state_dict)
 
 class Mlp(nn.Module):
     def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.):
@@ -481,14 +487,15 @@ class SwinTransformer(nn.Module):
         use_checkpoint (bool): Whether to use checkpointing to save memory. Default: False
     """
 
-    def __init__(self, img_size=224, patch_size=4, in_chans=3, out_channels=5,
+    def __init__(self,img_size=224, patch_size=4, in_chans=3, out_channels=5,
                  embed_dim=96, depths=[ 2, 2, 18, 2 ], num_heads=[ 4, 8, 16, 32 ],
                  window_size=7, mlp_ratio=4., qkv_bias=True, qk_scale=None,
                  drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1,
                  norm_layer=nn.LayerNorm, ape=False, patch_norm=True,
-                 use_checkpoint=False, **kwargs):
+                 pretrained=None, use_checkpoint=False, **kwargs):
         super().__init__()
         num_classes = out_channels
+        self.pretrained = pretrained
         self.num_classes = num_classes
         self.num_layers = len(depths)
         self.embed_dim = embed_dim
@@ -537,16 +544,88 @@ class SwinTransformer(nn.Module):
         self.avgpool = nn.AdaptiveAvgPool1d(1)
         self.head = nn.Linear(self.num_features, num_classes) if num_classes > 0 else nn.Identity()
 
-        self.apply(self._init_weights)
+        # self._init_weights
 
-    def _init_weights(self, m):
-        if isinstance(m, nn.Linear):
-            trunc_normal_(m.weight, std=.02)
-            if isinstance(m, nn.Linear) and m.bias is not None:
-                nn.init.constant_(m.bias, 0)
-        elif isinstance(m, nn.LayerNorm):
-            nn.init.constant_(m.bias, 0)
-            nn.init.constant_(m.weight, 1.0)
+    def init_weights(self):
+        # logger = get_root_logger()
+        if self.pretrained is None:
+            print(f'No pre-trained weights for '
+                        f'{self.__class__.__name__}, '
+                        f'training start from scratch')
+            # if self.use_abs_pos_embed:
+            #     trunc_normal_(self.absolute_pos_embed, std=0.02)
+            for m in self.modules():
+                if isinstance(m, nn.Linear):
+                    trunc_normal_init(m, std=.02, bias=0.)
+                elif isinstance(m, nn.LayerNorm):
+                    constant_init(m, val=1.0, bias=0.)
+        else:
+            ckpt = CheckpointLoader.load_checkpoint(
+                self.pretrained, map_location='cpu')
+            if 'state_dict' in ckpt:
+                _state_dict = ckpt['state_dict']
+            elif 'model' in ckpt:
+                _state_dict = ckpt['model']
+            else:
+                _state_dict = ckpt
+
+            state_dict = OrderedDict()
+            for k, v in _state_dict.items():
+                if k.startswith('backbone.'):
+                    state_dict[k[9:]] = v
+                elif k.startswith('encoder.') or k.startswith('decoder.'):
+                    state_dict[k[8:]] = v
+                else:
+                    state_dict[k] = v
+
+            # strip prefix of state_dict
+            if list(state_dict.keys())[0].startswith('module.'):
+                state_dict = {k[7:]: v for k, v in state_dict.items()}
+
+            # reshape absolute position embedding
+            if state_dict.get('absolute_pos_embed') is not None:
+                absolute_pos_embed = state_dict['absolute_pos_embed']
+                N1, L, C1 = absolute_pos_embed.size()
+                N2, C2, H, W = self.absolute_pos_embed.size()
+                if N1 != N2 or C1 != C2 or L != H * W:
+                    print('Error in loading absolute_pos_embed, pass')
+                else:
+                    state_dict['absolute_pos_embed'] = absolute_pos_embed.view(
+                        N2, H, W, C2).permute(0, 3, 1, 2).contiguous()
+
+            # interpolate position bias table if needed
+            relative_position_bias_table_keys = [
+                k for k in state_dict.keys()
+                if 'relative_position_bias_table' in k
+            ]
+            for table_key in relative_position_bias_table_keys:
+                table_pretrained = state_dict[table_key]
+                table_current = self.state_dict()[table_key]
+                L1, nH1 = table_pretrained.size()
+                L2, nH2 = table_current.size()
+                if nH1 != nH2:
+                    print(f'Error in loading {table_key}, pass')
+                elif L1 != L2:
+                    S1 = int(L1**0.5)
+                    S2 = int(L2**0.5)
+                    table_pretrained_resized = F.interpolate(
+                        table_pretrained.permute(1, 0).reshape(1, nH1, S1, S1),
+                        size=(S2, S2),
+                        mode='bicubic')
+                    state_dict[table_key] = table_pretrained_resized.view(
+                        nH2, L2).permute(1, 0).contiguous()
+
+            # load state_dict
+            load_state_dict(self, state_dict, strict=False)
+
+    # def _init_weights(self, m):
+    #     if isinstance(m, nn.Linear):
+    #         trunc_normal_(m.weight, std=.02)
+    #         if isinstance(m, nn.Linear) and m.bias is not None:
+    #             nn.init.constant_(m.bias, 0)
+    #     elif isinstance(m, nn.LayerNorm):
+    #         nn.init.constant_(m.bias, 0)
+    #         nn.init.constant_(m.weight, 1.0)
 
     @torch.jit.ignore
     def no_weight_decay(self):
@@ -572,7 +651,7 @@ class SwinTransformer(nn.Module):
 
     def forward(self, x):
         x = self.forward_features(x)
-        x = self.head(x)
+        # x = self.head(x)
         return x
 
     def flops(self):

@@ -74,7 +74,7 @@ class ModelBuilder:
     @staticmethod
     def build_net(block,net_cfg):
         net = load_model(block,net_cfg)
-        if 'pretrained' in net_cfg.keys() and net_cfg['pretrained']:
+        if hasattr(net, 'pretrained') and net.pretrained:
             net.init_weights()
         # net_encoder.apply(self.weights_init)
         # if 'weights' in net_cfg.keys() and net_cfg['weights']:
