@@ -16,8 +16,8 @@ def main():
 
     if args.data_name == 'ddsm_set':
         # dataset = DdsmSet(args.data_root,dataset_stat = True)
-        # generate_img_mask_pairs(DdsmSet(args.data_root,train=True,dataset_stat = True),args.data_name,train=False)
-        generate_img_mask_pairs(DdsmSet(args.data_root,train=False,dataset_stat = True),args.data_name,train=False)
+        generate_img_mask_pairs(DdsmSet(args.data_root,train=True,dataset_stat = True, target_size=(2000, 3000)),args.data_name,train=False)
+        generate_img_mask_pairs(DdsmSet(args.data_root,train=False,dataset_stat = True, target_size=(2000, 3000)),args.data_name,train=False)
     if args.data_name == 'csaw_set':
         dataset = CsawSet(args.data_root)
         generate_img_mask_pairs(dataset,args.data_name,train=True)
@@ -91,7 +91,7 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     # Basic Training Control
     parser.add_argument('--data_name',default='ddsm_set',type=str)
-    parser.add_argument('--data_root',default='/media/xumingjie/study/datasets/',type=str)
+    parser.add_argument('--data_root',default='/mnt/f/datasets/',type=str)
     args = parser.parse_args()
 
     if args.data_root is None:
