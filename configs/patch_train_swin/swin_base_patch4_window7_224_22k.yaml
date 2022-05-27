@@ -17,15 +17,15 @@ MODEL:
       pretrained: NULL
       weights: NULL
       args:
-        pretrained: 'logs/patch_train_swin/version_0/checkpoints/best-epoch=66-lesion=0.926.ckpt'
+        pretrained: 'pretrained/swin_base_patch4_window7_224_22k.pth'
         embed_dim: 128
         window_size: 7
         depths: [ 2, 2, 18, 2 ]
         num_heads: [ 4, 8, 16, 32 ]
       optimizer: SGD
       scheduler: step
-      learning_rate: 0.0001
-      lr_decay_rate: 0.01
+      learning_rate: 0.001
+      lr_decay_rate: 0.5
       lr_decay_steps: 5
       weight_decay: 0.0001
       beta1: 0.9

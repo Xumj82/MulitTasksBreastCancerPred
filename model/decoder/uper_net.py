@@ -47,7 +47,7 @@ class UperNet(nn.Module):
                 fc_dim=2048,
                 use_softmax=False, pool_scales=(1, 2, 3, 6),
                 fpn_inplanes=(256,512,1024,2048), fpn_dim=256):
-        super(Decoder, self).__init__()
+        super(UperNet, self).__init__()
         self.use_softmax = use_softmax
         
 
