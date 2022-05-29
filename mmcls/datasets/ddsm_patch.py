@@ -37,7 +37,7 @@ class DdsmPatch(BaseDataset):
                     info['gt_label'] = np.array(0, dtype=np.int64)                
                     if type == 'bkg':
                         info['gt_label'] = np.array(0, dtype=np.int64)
-                    if type == 'calc':
+                    if type == 'calcification':
                         info['gt_label'] = np.array(1, dtype=np.int64)
                     if type == 'mass':
                         info['gt_label'] = np.array(2, dtype=np.int64)
@@ -49,11 +49,11 @@ class DdsmPatch(BaseDataset):
                     
                     if type == 'bkg':
                         info['gt_label'] = np.array(0, dtype=np.int64)
-                    if type == 'calc' and pathology!='MALIGNANT':
+                    if type == 'calcification' and pathology!='MALIGNANT':
                         info['gt_label'] = np.array(1, dtype=np.int64)
                     if type == 'mass' and pathology!='MALIGNANT':
                         info['gt_label'] = np.array(2, dtype=np.int64)                        
-                    if type == 'calc'and pathology=='MALIGNANT':
+                    if type == 'calcification'and pathology=='MALIGNANT':
                         info['gt_label'] = np.array(3, dtype=np.int64)
                     if type == 'mass'and pathology=='MALIGNANT':
                         info['gt_label'] = np.array(4, dtype=np.int64)

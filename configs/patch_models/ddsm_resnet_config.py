@@ -4,9 +4,10 @@ from sys import prefix
 _base_ = [
     '../mmcls/_base_/models/resnext50_32x4d.py',
     # 'configs/_base_/datasets/imagenet_bs32_pil_resize.py',
-    '../mmcls/_base_/schedules/imagenet_bs256.py', 
-    '../mmcls/_base_/default_runtime.py'
+    # '../mmcls/_base_/schedules/imagenet_bs256.py', 
+    # '../mmcls/_base_/default_runtime.py'
 ]
+
 
 
 pretrained = 'checkpoints/resnext50_32x4d_b32x8_imagenet_20210429-56066e27.pth'
@@ -15,7 +16,7 @@ model = dict(
         init_cfg=dict(type='Pretrained', checkpoint=pretrained, prefix='backbone')),
     head=dict(
             type='LinearClsHead',
-            num_classes=3,
+            num_classes=5,
             in_channels=2048,
             loss=dict(type='CrossEntropyLoss', loss_weight=1.0),
             topk=(1,),
@@ -76,23 +77,47 @@ data = dict(
     samples_per_gpu=2,
     workers_per_gpu=1,
     train=dict(
-        classes = ('bkg','calc','mass'),
+        classes = ('bkg','be_calc','be_mass','ma_calc','ma_mass'),
         type=dataset_type,
-        data_prefix='/home/xumingjie/dataset/patch_set/img_dir/train',
-        ann_file='/home/xumingjie/dataset/patch_set/img_dir/train_meta.csv',
+        data_prefix='/root/autodl-tmp/patch_set/img_dir/train',
+        ann_file='/root/autodl-tmp/patch_set/img_dir/train_meta.csv',
         pipeline=train_pipeline),
     val=dict(
-        classes = ('bkg','calc','mass'),
+        classes = ('bkg','be_calc','be_mass','ma_calc','ma_mass'),
         type=dataset_type,
-        data_prefix='/home/xumingjie/dataset/patch_set/img_dir/test',
-        ann_file='/home/xumingjie/dataset/patch_set/img_dir/test_meta.csv',
+        data_prefix='/root/autodl-tmp/patch_set/img_dir/test',
+        ann_file='/root/autodl-tmp/patch_set/img_dir/test_meta.csv',
         pipeline=test_pipeline),
     test=dict(
         # replace `data/val` with `data/test` for standard test
-        classes = ('bkg','calc','mass'),
+        classes = ('bkg','be_calc','be_mass','ma_calc','ma_mass'),
         type=dataset_type,
-        data_prefix='/home/xumingjie/dataset/patch_set/img_dir/test',
-        ann_file='/home/xumingjie/dataset/patch_set/img_dir/test_meta.csv',
+        data_prefix='/root/autodl-tmp/patch_set/img_dir/test',
+        ann_file='/root/autodl-tmp/patch_set/img_dir/test_meta.csv',
         pipeline=test_pipeline))
 
-evaluation = dict(interval=1, metric='accuracy')
+# checkpoint saving
+checkpoint_config = dict(interval=3)
+# yapf:disable
+log_config = dict(
+    interval=100,
+    hooks=[
+        dict(type='TextLoggerHook'),
+        dict(type='TensorboardLoggerHook')
+    ])
+# yapf:enable
+
+dist_params = dict(backend='nccl')
+log_level = 'INFO'
+load_from = None
+resume_from = None
+workflow = [('train', 1)]
+
+# optimizer
+optimizer = dict(type='Adam', lr=0.001, weight_decay=0.0001)
+optimizer_config = dict(grad_clip=None)
+# learning policy
+lr_config = dict(policy='step', step=[30, 60, 90])
+runner = dict(type='EpochBasedRunner', max_epochs=3)
+
+evaluation = dict(interval=1, metric='accuracy',metric_options = dict(topk=(1,)))
