@@ -74,8 +74,8 @@ test_pipeline = [
 #     dict(type='Collect', keys=['img'])
 # ]
 data = dict(
-    samples_per_gpu=2,
-    workers_per_gpu=1,
+    samples_per_gpu=128,
+    workers_per_gpu=12,
     train=dict(
         classes = ('bkg','be_calc','be_mass','ma_calc','ma_mass'),
         type=dataset_type,
