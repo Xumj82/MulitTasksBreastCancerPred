@@ -1,4 +1,4 @@
-import lmdb
+
 import cv2
 import random
 import os
@@ -20,7 +20,7 @@ class PatchSet(Dataset):
     def __init__(self, img_dir, roi_df, 
                 out_dir=None,
                 out_csv=None,
-                target_size = (1152,896),
+                target_size = (3000,2000),
                 patch_size=224,
                 jitter=10,
                 positiv_overlap = 0.8, 
