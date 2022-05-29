@@ -40,16 +40,16 @@ def conv3x3_bn_relu(in_planes, out_planes, stride=1):
             )
 # upernet
 class UperNet(nn.Module):
-    def __init__(self, nr_classes={
-                            'pathology':1,
-                            'lesion': 2
-                        }, 
+    def __init__(self, nr_classes,
+                seg_size,
+                output_switch = dict(pathology = True,lesion = True),
                 fc_dim=2048,
                 use_softmax=False, pool_scales=(1, 2, 3, 6),
                 fpn_inplanes=(256,512,1024,2048), fpn_dim=256):
-        super(Decoder, self).__init__()
+        super(UperNet, self).__init__()
+        self.output_switch = output_switch
         self.use_softmax = use_softmax
-        
+        self.seg_size = seg_size
 
         # PPM Module
         self.ppm_pooling = []
@@ -90,8 +90,8 @@ class UperNet(nn.Module):
         self.conv_fusion = conv3x3_bn_relu(len(fpn_inplanes) * fpn_dim, fpn_dim, 1)
 
         # background included. if ignore in loss, output channel 0 will not be trained.
-        self.nr_pathology_class, self.nr_lesion_class, = \
-            nr_classes['pathology'], nr_classes['lesion']
+        self.nr_pathology_class, self.nr_lesion_class, self.nr_radtime_class= \
+            nr_classes['pathology'], nr_classes['lesion'], nr_classes['rad_time']
 
         # input: PPM out, input_dim: fpn_dim
         self.pathology_head = nn.Sequential(
@@ -105,8 +105,16 @@ class UperNet(nn.Module):
             nn.Conv2d(fpn_dim, self.nr_lesion_class, kernel_size=1, bias=True)
         )
 
-    def forward(self, conv_out,orig_feed,output_switch = dict(pathology = True,lesion = True)):
-        seg_size= orig_feed['seg_lesion'].shape[-2:]
+        # input: Fusion out, input_dim: fpn_dim
+        self.rad_head = nn.Sequential(
+            conv3x3_bn_relu(fpn_dim, fpn_dim, 1),
+            nn.AdaptiveAvgPool2d(1),
+            nn.Conv2d(fpn_dim, self.nr_radtime_class, kernel_size=1, bias=True)
+        )
+
+    def forward(self, conv_out):
+        seg_size= self.seg_size
+        output_switch = self.output_switch
         output_dict = dict(pathology = None,lesion = None )
 
         conv5 = conv_out[-1]
@@ -132,6 +140,9 @@ class UperNet(nn.Module):
 
         if output_switch['pathology']: # pathology
             output_dict['pathology'] = self.pathology_head(f)
+
+        if output_switch['rad_time']: # pathology
+            output_dict['rad_time'] = self.rad_head(f)
 
         if output_switch['lesion']:
             fpn_feature_list = [f]
@@ -166,6 +177,7 @@ class UperNet(nn.Module):
             # fusion_out = torch.cat(fusion_list, 1)
 
             x = self.conv_fusion(fusion_out)
+            x = F.interpolate(x, size=seg_size, mode='bilinear', align_corners=False)
             output_dict['lesion'] = self.lesion_head(x)
 
         if self.use_softmax:  # is True during inference
@@ -181,13 +193,15 @@ class UperNet(nn.Module):
             output_dict['lesion'] = x
 
         else:   # Training
-            for k in ['pathology', 'lesion']:
+            for k in ['pathology', 'lesion', 'rad_time']:
                 if output_dict[k] is None:
                     continue
                 x = output_dict[k]
                 # x = F.log_softmax(x, dim=1)
                 if k == "pathology":  # for scene
-                    x = x.squeeze(3).squeeze(2)
+                    x = x.squeeze(3).squeeze(2).squeeze(1)
+                if k == "rad_time":  # for scene
+                    x = x.squeeze(3).squeeze(2).squeeze(1)
                 output_dict[k] = x
 
         return output_dict

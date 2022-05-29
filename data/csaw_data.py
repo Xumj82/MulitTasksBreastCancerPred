@@ -14,17 +14,19 @@ import torch.utils.data as data
 from torchvision import transforms
 from sklearn.model_selection import train_test_split
 
-class SegemData(data.Dataset):
+class CsawData(data.Dataset):
     def __init__(self, 
                 data_dir='/mnt/hdd/datasets/ddsm_dataset/{}/train',
                 stage = 'fit',
-                pic_size =(1152,896),
-                classes = 3,
+                pic_size =(896,1152),
+                classes = 2,
                 train=True,
                 aug_prob=0.5,
+                elastic_param=300,
                 img_mean=(0.485),
                 img_std=(0.229),
-                aug = True
+                aug = True,
+                repeat_channel = True
                 ):
         # self.__dict__.update(locals())
         self.train = train
@@ -32,7 +34,9 @@ class SegemData(data.Dataset):
         self.img_std = img_std
         self.data_dir = data_dir
         self.stage = stage
+        self.elastic_param = elastic_param
         self.aug = aug
+        self.repeat_channel = repeat_channel
         if self.stage=='fit':
             self.csv_file = data_dir+'/train_meta.csv'
         else:
@@ -65,36 +69,44 @@ class SegemData(data.Dataset):
         else:
             img = cv2.imread(os.path.join(self.data_dir,'img_dir/test',self.data_list.iloc[index]['img_id']+'.png'),cv2.IMREAD_ANYDEPTH)         
             ann = cv2.imread(os.path.join(self.data_dir,'ann_dir/test',self.data_list.iloc[index]['img_id']+'.png'),cv2.IMREAD_GRAYSCALE)
-        # ann = np.where(ann > 4,0,ann)
+        
+        img = cv2.resize(img, self.pic_size)
+        ann = cv2.resize(ann, self.pic_size)
 
-        if self.train:
-            [img, ann] = elasticdeform.deform_random_grid([img,ann],sigma=15, points=3,axis=(0,1),)
         ann = np.where(ann>0, 1, 0)
         pathology_label = 1 if  self.data_list.iloc[index]['pathology'] else 0
-
-        # if self.classes == 3:
-        #     ann = np.where(ann == 1*50, 1, ann)
-        #     ann = np.where(ann == 2*50, 2, ann)
-        #     ann = np.where(ann == 3*50, 1, ann)
-        #     ann = np.where(ann == 4*50, 2, ann)
+        rad_time = self.data_list.iloc[index]['rad_time']
+        
         aug = A.Compose([
-            A.ToFloat(max_value=65535.0),
+            A.ToFloat(max_value=4095.0),
             A.Normalize(mean=self.img_mean, std=self.img_std),
             A.VerticalFlip(p=self.aug_prob),              
-            A.RandomRotate90(p=self.aug_prob),
-            A.ElasticTransform(alpha=self.elastic_param, sigma=self.elastic_param * 0.05, alpha_affine=self.elastic_param * 0.03, p=self.aug_prob),            
+            A.SafeRotate(p=self.aug),
+            A.ElasticTransform(alpha=self.elastic_param, sigma=self.elastic_param * 0.05, alpha_affine=self.elastic_param * 0.03, p=self.aug_prob),    
             ]
         ) if self.train else A.Compose([
-            A.ToFloat(max_value=65535.0),
+            A.ToFloat(max_value=4095.0),
             A.Normalize(mean=self.img_mean, std=self.img_std),
         ])
+        augmented = aug(image=img, mask=ann)
+        image_auged = augmented['image']
+        mask_auged = augmented['mask']
 
-        pathology_tensor = torch.tensor(pathology_label).long()
+        mask_tensor = torch.tensor(mask_auged).long()
+        img_tensor = torch.unsqueeze(torch.tensor(image_auged),0)
+        if self.repeat_channel:
+            img_tensor = img_tensor.repeat(3,1,1).float()
+
+        rad_time_tensor = torch.tensor(rad_time).float()
+        pathology_tensor = torch.tensor(pathology_label).float()
+
         output = dict(
             input=img_tensor,
-            seg_lesion=ann_tensor,
+            lesion=mask_tensor,
             pathology=pathology_tensor,
+            rad_time=rad_time_tensor
         )
+
         return output
 
     def __len__(self):

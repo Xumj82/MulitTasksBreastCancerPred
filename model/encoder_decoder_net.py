@@ -17,7 +17,39 @@ import metrics
 from lib.train_utils import load_pretrained
 from mmseg.models import losses
 from mmcv.runner import BaseModule
+from torch.autograd import Variable
 
+class FocalLoss(nn.Module):
+    def __init__(self, gamma=0, alpha=None, size_average=True):
+        super(FocalLoss, self).__init__()
+        self.gamma = gamma
+        self.alpha = alpha
+        if isinstance(alpha,(float,int)): self.alpha = torch.Tensor([alpha,1-alpha])
+        if isinstance(alpha,list): self.alpha = torch.Tensor(alpha)
+        self.size_average = size_average
+
+    def forward(self, input, target):
+        target = target.long()
+        if input.dim()>2:
+            input = input.view(input.size(0),input.size(1),-1)  # N,C,H,W => N,C,H*W
+            input = input.transpose(1,2)    # N,C,H*W => N,H*W,C
+            input = input.contiguous().view(-1,input.size(2))   # N,H*W,C => N*H*W,C
+        target = target.view(-1,1)
+
+        logpt = F.log_softmax(input)
+        logpt = logpt.gather(1,target)
+        logpt = logpt.view(-1)
+        pt = Variable(logpt.data.exp())
+
+        if self.alpha is not None:
+            if self.alpha.type()!=input.data.type():
+                self.alpha = self.alpha.type_as(input.data)
+            at = self.alpha.gather(0,target.data.view(-1))
+            logpt = logpt * Variable(at)
+
+        loss = -1 * (1-pt)**self.gamma * logpt
+        if self.size_average: return loss.mean()
+        else: return loss.sum()
 
 class SegmentationModuleBase(pl.LightningModule):
     def __init__(self):
@@ -74,39 +106,9 @@ class ModelBuilder:
     @staticmethod
     def build_net(block,net_cfg):
         net = load_model(block,net_cfg)
-        if hasattr(net, 'pretrained') and net.pretrained:
+        if hasattr(net, 'weights') and net.weights:
             net.init_weights()
-        # net_encoder.apply(self.weights_init)
-        # if 'weights' in net_cfg.keys() and net_cfg['weights']:
-        #     print('Loading weights for net_encoder')
-        #     weights = torch.load(net_cfg['weights'], map_location=lambda storage, loc: storage)
-        #     net.load_state_dict(weights, strict=True)
-        # if 'pretrained' in net_cfg.keys() and net_cfg['pretrained']:
-        #     load_pretrained(net_cfg['pretrained'], net)
         return net
-
-    def build_encoder(self):
-        net_encoder = load_model('encoder',self.encoder['name'],self.encoder)
-        # net_encoder.apply(self.weights_init)
-        if self.encoder['weights']:
-            print('Loading weights for net_encoder')
-            weights = torch.load(self.encoder['weights'], map_location=lambda storage, loc: storage)
-            net_encoder.load_state_dict(weights, strict=True)
-        if self.encoder['pretrained']:
-            load_pretrained(self.encoder['pretrained'], net_encoder)
-        return net_encoder
-
-    def build_decoder(self):
-        net_decoder = load_model('decoder',self.decoder['name'],self.decoder)
-
-        # net_decoder.apply(self.weights_init)
-        if self.decoder['weights']:
-            print('Loading weights for net_decoder')
-            net_decoder.load_state_dict(
-                torch.load(self.decoder['weights'], map_location=lambda storage, loc: storage), strict=False)
-        if self.decoder['pretrained']:
-            load_pretrained(self.decoder['pretrained'], net_decoder)
-        return net_decoder
 
 def load_model(package,net_cfg)->BaseModule:
     name = net_cfg['name']
@@ -201,7 +203,10 @@ class Segement_Net(pl.LightningModule):
         out = self(input)
 
         loss_dict = dict()
-        for idx ,k in enumerate(out.keys()):
+        for idx ,k in enumerate(self.loss_funcs.keys()):
+            # if k == 'lesion':
+            #     loss_dict[k+'_loss'] = self.hparams.loss_scale[k]* self.loss_funcs[k](out[k], batch[k].long())
+            #     continue 
             loss_dict[k+'_loss'] = self.hparams.loss_scale[k]* self.loss_funcs[k](out[k], batch[k])
         loss = sum(loss_dict.values())
         self.log_dict(loss_dict,on_step=True, on_epoch=False, prog_bar=True)
@@ -212,7 +217,7 @@ class Segement_Net(pl.LightningModule):
         out = self(input)
 
         loss_dict = dict()
-        for idx ,k in enumerate(out.keys()):
+        for idx ,k in enumerate(self.loss_funcs.keys()):
             loss_dict['val_'+k+'_loss'] = self.hparams.loss_scale[k]* self.loss_funcs[k](out[k], batch[k])
             self.metric_funcs[k].update(out[k].cpu(), batch[k].cpu())
         loss = sum(loss_dict.values())
@@ -251,6 +256,8 @@ class Segement_Net(pl.LightningModule):
                 self.metric_funcs[k] = torchmetrics.Accuracy()
             if self.hparams.metrics[k] == 'precision':
                 self.metric_funcs[k] = torchmetrics.Precision()
+            if self.hparams.metrics[k] == 'cosine':
+                self.metric_funcs[k] = torchmetrics.CosineSimilarity()
 
     def configure_optimizers(self):
         optimizers = []
