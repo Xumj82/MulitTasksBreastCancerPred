@@ -11,3 +11,7 @@
 /lib/__pycache__
 /asset/upload_one
 staticis.txt
+*.pyc
+checkpoints
+work_dirs
+logs

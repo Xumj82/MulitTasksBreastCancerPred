@@ -19,7 +19,7 @@ class PatchSet(Dataset):
     def __init__(self, img_dir, roi_df, 
                 out_dir=None,
                 out_csv=None,
-                target_size = (1152,896),
+                target_size = (3000,2000),
                 patch_size=224,
                 jitter=10,
                 positiv_overlap = 0.8, 
@@ -210,51 +210,51 @@ class PatchSet(Dataset):
         # records = pd.DataFrame(self.sample_records,columns=['img_id','patch_id','type','pathology','full_img','ROI_img'])
         # records.to_csv(self.out_csv,index=False)
 
-    def get_patch_from_storage(self,idx=0, rand = False,):
-        patch_df = pd.read_csv(self.out_csv)
-        self.env = lmdb.open(self.lmdbfile, map_size=1099511627776)
-        self.txn = self.env.begin(write=False)
-        if rand:
-            idx = np.random.randint(patch_df.shape[0], size=1)[0]
-        row = patch_df.iloc[idx]
-        patch_img = self.txn.get(row['patch_id'].encode())
-        patch_img = np.frombuffer(patch_img, dtype=np.uint16).reshape(self.patch_size,self.patch_size)
-        return convert_to_8bit(patch_img)  
+    # def get_patch_from_storage(self,idx=0, rand = False,):
+    #     patch_df = pd.read_csv(self.out_csv)
+    #     self.env = lmdb.open(self.lmdbfile, map_size=1099511627776)
+    #     self.txn = self.env.begin(write=False)
+    #     if rand:
+    #         idx = np.random.randint(patch_df.shape[0], size=1)[0]
+    #     row = patch_df.iloc[idx]
+    #     patch_img = self.txn.get(row['patch_id'].encode())
+    #     patch_img = np.frombuffer(patch_img, dtype=np.uint16).reshape(self.patch_size,self.patch_size)
+    #     return convert_to_8bit(patch_img)  
 
-    def show_sample_from_generation(self,idx,figsize=(5,50)):
-        self.env = lmdb.open(self.lmdbfile, map_size=1099511627776)
-        self.txn = self.env.begin(write=True)
-        lesion_patches =  self.sample_patches(idx)
-        patch_img = []
-        for lesion in lesion_patches:
-            patch_img.append(lesion['data'])
+    # def show_sample_from_generation(self,idx,figsize=(5,50)):
+    #     self.env = lmdb.open(self.lmdbfile, map_size=1099511627776)
+    #     self.txn = self.env.begin(write=True)
+    #     lesion_patches =  self.sample_patches(idx)
+    #     patch_img = []
+    #     for lesion in lesion_patches:
+    #         patch_img.append(lesion['data'])
 
-        return patch_img
+    #     return patch_img
     
-    def show_sample_from_storage(self,idx=0, rand = False,figsize=(5,50)):
-        patch_df = pd.read_csv(self.out_csv)
-        self.env = lmdb.open(self.lmdbfile, map_size=1099511627776)
-        self.txn = self.env.begin(write=False)
-        if rand:
-            idx = np.random.randint(patch_df.shape[0], size=1)[0]
-        row = patch_df.iloc[idx]
-        patch_img = self.txn.get(row['patch_id'].encode())
-        patch_img = np.frombuffer(patch_img, dtype=np.uint16).reshape(self.patch_size,self.patch_size)
-        full_img_path = row['full_img']
-        full_img = read_resize_img(path.join(self.img_dir,full_img_path), target_size=self.target_size,gs_255=self.gs_255)
-        mask_img_path = row['ROI_img']
-        if type(mask_img_path) ==  str:
+    # def show_sample_from_storage(self,idx=0, rand = False,figsize=(5,50)):
+    #     patch_df = pd.read_csv(self.out_csv)
+    #     self.env = lmdb.open(self.lmdbfile, map_size=1099511627776)
+    #     self.txn = self.env.begin(write=False)
+    #     if rand:
+    #         idx = np.random.randint(patch_df.shape[0], size=1)[0]
+    #     row = patch_df.iloc[idx]
+    #     patch_img = self.txn.get(row['patch_id'].encode())
+    #     patch_img = np.frombuffer(patch_img, dtype=np.uint16).reshape(self.patch_size,self.patch_size)
+    #     full_img_path = row['full_img']
+    #     full_img = read_resize_img(path.join(self.img_dir,full_img_path), target_size=self.target_size,gs_255=self.gs_255)
+    #     mask_img_path = row['ROI_img']
+    #     if type(mask_img_path) ==  str:
             
-            mask_img = read_resize_img(path.join(self.img_dir,mask_img_path), target_size=self.target_size,gs_255=True)
+    #         mask_img = read_resize_img(path.join(self.img_dir,mask_img_path), target_size=self.target_size,gs_255=True)
 
-            idx,cont_areas,contours = get_max_connected_area(mask_img)
-            rx,ry,rw,rh = cv2.boundingRect(contours[idx])
-            cv2.rectangle(full_img,(rx,ry),(rx+rw, ry+rh), (0, 255, 0), 1)
-        full_img = convert_to_8bit(full_img)
-        cv2.imwrite('sample images/test_full.png', full_img) 
-        cv2.imwrite('sample images/test_patch.png', patch_img) 
-        print('{} {} {}'.format(row['patch_id'],row['type'],row['pathology']))
-        self.env.close()
+    #         idx,cont_areas,contours = get_max_connected_area(mask_img)
+    #         rx,ry,rw,rh = cv2.boundingRect(contours[idx])
+    #         cv2.rectangle(full_img,(rx,ry),(rx+rw, ry+rh), (0, 255, 0), 1)
+    #     full_img = convert_to_8bit(full_img)
+    #     cv2.imwrite('sample images/test_full.png', full_img) 
+    #     cv2.imwrite('sample images/test_patch.png', patch_img) 
+    #     print('{} {} {}'.format(row['patch_id'],row['type'],row['pathology']))
+    #     self.env.close()
 
     def sample_patches(self, img_id,lesion_type,pathology,img,roi_areas):
 

@@ -13,3 +13,7 @@
 # limitations under the License.
 
 from .data_interface import DInterface
+from .csaw_data import CsawData
+from .ddsm_data import DdsmData
+from .csaw_set import CsawSet
+from .ddsm_set import DdsmSet

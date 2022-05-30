@@ -3,14 +3,14 @@ MODE: Train
 TRAIN:
   Trainer:
     accelerator: gpu
-    devices: [1]
+    devices: [0]
     max_epochs: 100
   acc_monitor: lesion
   load_dir:
   load_ver:
   load_v_num:
   load_best:
-  log_dir: patch_train_swin
+  log_dir: /root/tf-logs/patch_train
   # acc_monitor:
   # EPOCHS: 90
   # MIN_LR: 1.25e-6

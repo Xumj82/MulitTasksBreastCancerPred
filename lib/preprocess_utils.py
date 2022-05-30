@@ -16,6 +16,121 @@ from torch.utils.data import Dataset
 
 ## put you dir here 
 
+def clahe(img,max_pixel_val = 255,clip=2.0, tile=(8, 8)):
+    
+    '''
+    This function applies the Contrast-Limited Adaptive
+    Histogram Equalisation filter to a given image.
+    
+    Parameters
+    ----------
+    img : {numpy.ndarray}
+        The image to edit.
+    clip : {int or floa}
+        Threshold for contrast limiting.
+    tile : {tuple (int, int)}
+        Size of grid for histogram equalization. Input
+        image will be divided into equally sized
+        rectangular tiles. `tile` defines the number of
+        tiles in row and column.
+    
+    Returns
+    -------
+    clahe_img : {numpy.ndarray}
+        The edited image.
+    '''
+    
+    # Convert to uint8.
+    # img = skimage.img_as_ubyte(img)
+    img = cv2.normalize(
+        img,
+        None,
+        alpha=0,
+        beta=max_pixel_val,
+        norm_type=cv2.NORM_MINMAX,
+        dtype=cv2.CV_32F,
+    )
+    if max_pixel_val == 255:
+        img = img.astype("uint8")
+    if max_pixel_val == 65525:
+        img = img.astype("uint16")
+    clahe_create = cv2.createCLAHE(clipLimit=clip, tileGridSize=tile)
+    clahe_img = clahe_create.apply(img)
+
+    return clahe_img
+
+def crop_borders(img,border_size=(0.01,0.04,0.01,0.04)):
+    
+    '''
+    This function crops 1% from all four sides of the given
+    image.
+    
+    Parameters
+    ----------
+    img : {numpy.ndarray}
+        The image to crop.
+        
+    Returns
+    -------
+    cropped_img: {numpy.ndarray}
+        The cropped image.
+    '''
+    nrows, ncols = img.shape
+
+    # Get the start and end rows and columns
+    l_crop = int(ncols * border_size[0])
+    r_crop = int(ncols * (1 - border_size[1]))
+    u_crop = int(nrows * border_size[2])
+    d_crop = int(nrows * (1 - border_size[3]))
+
+    cropped_img = img[u_crop:d_crop, l_crop:r_crop]
+    
+    return cropped_img
+
+def HorizontalFlip(mask):
+    
+    '''
+    This function figures out how to flip (also entails whether
+    or not to flip) a given mammogram and its mask. The correct
+    orientation is the breast being on the left (i.e. facing
+    right) and it being the right side up. i.e. When the
+    mammogram is oriented correctly, the breast is expected to
+    be found in the bottom left quadrant of the frame.
+    
+    Parameters
+    ----------
+    mask : {numpy.ndarray, dtype=np.uint8}
+        The corresponding mask of the CC image to flip.
+
+    Returns
+    -------
+    horizontal_flip : {boolean}
+        True means need to flip horizontally,
+        False means otherwise.
+    '''
+    
+    # Get number of rows and columns in the image.
+    nrows, ncols = mask.shape
+    x_center = ncols // 2
+    y_center = nrows // 2
+    
+    # Sum down each column.
+    col_sum = mask.sum(axis=0)
+    # Sum across each row.
+    row_sum = mask.sum(axis=1)
+    
+    left_sum = sum(col_sum[0:x_center])
+    right_sum = sum(col_sum[x_center:-1])
+    top_sum = sum(row_sum[0:y_center])
+    bottom_sum = sum(row_sum[y_center:-1])
+    
+    if left_sum < right_sum:
+        horizontal_flip = True
+    else:
+        horizontal_flip = False
+        
+    return horizontal_flip
+
 def generate_new_meta():
     calc_train = pd.read_csv('csv/calc_case_description_train_set.csv')
     mass_train = pd.read_csv('csv/mass_case_description_train_set.csv')
@@ -87,7 +202,9 @@ def convert_to_16bit(img):
     return (img * 65535).astype(np.float32)
 
 def read_resize_img(fname, target_size=None, target_height=None, 
-                    target_scale=None, gs_255=False, rescale_factor=None):
+                    target_scale=None, gs_255=False, rescale_factor=None,
+                    crop_borders_size=None
+                    ):
     '''Read an image (.png, .jpg, .dcm) and resize it to target size.
     '''
     if target_size is None and target_height is None:
@@ -105,12 +222,16 @@ def read_resize_img(fname, target_size=None, target_height=None,
             img = cv2.imread(fname, cv2.IMREAD_UNCHANGED)
     if target_height is not None:
         target_width = int(float(target_height)/img.shape[0]*img.shape[1])
-    else:
+    elif target_size is not None:
         target_height, target_width = target_size
+    else:
+        target_height, target_width = img.shape
     if (target_height, target_width) != img.shape:
         img = cv2.resize(
             img, dsize=(target_width, target_height), 
             interpolation=cv2.INTER_CUBIC)
+    if crop_borders_size is not None:
+        img = crop_borders(img,crop_borders_size)
     img = img.astype('float32')
     if target_scale is not None:
         img_max = img.max() if img.max() != 0 else target_scale
@@ -159,7 +280,7 @@ def crop_val(v, minv, maxv):
     v = v if v <= maxv else maxv
     return v
 
-def segment_breast(img, low_int_threshold=0.05, crop=True,erosion= False):
+def segment_breast(img, low_int_threshold=0.05, crop=True, erosion= False):
     '''Perform breast segmentation
     Args:
         low_int_threshold([float or int]): Low intensity threshold to 
