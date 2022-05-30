@@ -1,4 +1,3 @@
-import lmdb
 import cv2
 import random
 import os
@@ -197,7 +196,9 @@ class PatchSet(Dataset):
                         img_id,patches = self[i]
                         for idx, patch in enumerate(patches):
                             patch_id = img_id+'_'+patch['type']+'_'+str(idx)
-                            cv2.imwrite(os.path.join(self.out_dir,patch_id+".png"),patch['data'])
+                            if not os.path.exists(os.path.join(self.out_dir,patch['type'])):
+                                os.makedirs(os.path.join(self.out_dir,patch['type']))
+                            cv2.imwrite(os.path.join(self.out_dir,patch['type'],patch_id+".png"),patch['data'])
                             # self.txn.put(patch_id.encode("ascii"), patch['data'])
                             writer.writerow([img_id, patch_id,patch['type'],patch['pathology'],self.full_images[i],patch['roi_path']])
                     except Exception as e:

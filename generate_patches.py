@@ -12,8 +12,10 @@ def main(args):
         os.makedirs(os.path.join(args.output_dir, 'img_dir/train/'))
 
     train_set = PatchSet(
+       
         args.data_dir+'/cbis-ddsm-png/',
         train_roi,
+        target_size=(3000,2000),
         out_dir=os.path.join(args.output_dir, 'img_dir/train/'),
         out_csv=os.path.join(args.output_dir,'train_meta.csv'),
         number_positive = args.number_positive,
@@ -27,6 +29,7 @@ def main(args):
     test_set = PatchSet( 
         args.data_dir+'/cbis-ddsm-png/',
         test_roi,
+        target_size=(3000,2000),
         out_dir=os.path.join(args.output_dir, 'img_dir/test/'),
         out_csv=os.path.join(args.output_dir,'test_meta.csv'),
         number_positive = args.number_positive,
@@ -43,13 +46,13 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     # Basic Training Control
     # parser.add_argument('--ddsm_root', default="/media/xumingjie/study/datasets/cbis-ddsm-png/", type=str)
-    parser.add_argument('--data_dir', default='/home/xumingjie/Desktop/DDSM_DATA/', type=str)
+    parser.add_argument('--data_dir', default='/mnt/f/datasets/', type=str)
     parser.add_argument('--patch_size', default=224, type=int)
-    parser.add_argument('--csv_dir', default='/home/xumingjie/Desktop/DDSM_DATA//csv/', type=str)
+    parser.add_argument('--csv_dir', default='/mnt/f/datasets/csv/', type=str)
     # parser.add_argument('--mdb_dir', default='/media/xumingjie/study/datasets/mdb/', type=str)
-    parser.add_argument('--output_dir', default='/home/xumingjie/dataset/patch_set/', type=str)
+    parser.add_argument('--output_dir', default='/mnt/c/Users/11351/Desktop/patch_set/', type=str)
     # parser.add_argument('--output_csv', default='patch_images', type=str)
-    parser.add_argument('--number_positive', default=50, type=int)
+    parser.add_argument('--number_positive', default=20, type=int)
     parser.add_argument('--number_negative', default=10, type=int)
     parser.add_argument('--number_hard_negative', default=10, type=int)
     args = parser.parse_args()
