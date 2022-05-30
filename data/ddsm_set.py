@@ -87,7 +87,9 @@ class DdsmSet(Dataset):
                                     gs_255=self.gs_255)
 
         full_img_segment,bbox = segment_breast(full_img, erosion= True)
+        
         full_img_segment = cv2.resize(full_img_segment.astype(np.uint16),[self.target_size[1],self.target_size[0]])
+
         if self.CLAHE:
             full_img_segment = clahe(full_img_segment,65535)
 

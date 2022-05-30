@@ -59,7 +59,7 @@ def clahe(img,max_pixel_val = 255,clip=2.0, tile=(8, 8)):
 
     return clahe_img
 
-def CropBorders(img,border_size=(0.01,0.04,0.01,0.04)):
+def crop_borders(img,border_size=(0.01,0.04,0.01,0.04)):
     
     '''
     This function crops 1% from all four sides of the given
@@ -231,7 +231,7 @@ def read_resize_img(fname, target_size=None, target_height=None,
             img, dsize=(target_width, target_height), 
             interpolation=cv2.INTER_CUBIC)
     if crop_borders_size is not None:
-        img = CropBorders(img,crop_borders_size)
+        img = crop_borders(img,crop_borders_size)
     img = img.astype('float32')
     if target_scale is not None:
         img_max = img.max() if img.max() != 0 else target_scale

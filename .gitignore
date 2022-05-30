@@ -14,3 +14,4 @@ staticis.txt
 *.pyc
 checkpoints
 work_dirs
+logs

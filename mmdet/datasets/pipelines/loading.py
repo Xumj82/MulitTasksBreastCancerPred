@@ -135,11 +135,15 @@ class LoadMMImageFromFile:
         else:
             filename = results['img_info']['filename']
 
+        # img = cv2.imread(filename, cv2.IMREAD_ANYDEPTH)
+        # img = np.expand_dims(img, axis=-1)
+        # img = np.repeat(img, 3, axis=-1)
+        # img = img.astype(np.float32)
+        # img = (img-img.min())/img.max()*255
         img = cv2.imread(filename, cv2.IMREAD_ANYDEPTH)
-        img = np.expand_dims(img, axis=-1)
-        img = np.repeat(img, 3, axis=-1)
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
         img = img.astype(np.float32)
-        img = (img-img.min())/img.max()*255
+
         # img_bytes = self.file_client.get(filename)
 
         # # img_np = np.frombuffer(img_bytes, np.uint8)
