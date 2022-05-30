@@ -9,21 +9,23 @@ from mmdet.apis import set_random_seed
 
 # Modify dataset type and path
 cfg = Config.fromfile('configs/breast_models/csaw_breast_mask_rcnn_config.py')
-cfg.dataset_type = 'COCODataset'
-cfg.data.samples_per_gpu=2
-cfg.data.workers_per_gpu=1
-cfg.data.test.ann_file = '/mnt/nas4/diskl/MMG/Data/MMG-R1/CSAW_1/csaw_coco/test/annotation_coco.json'
-cfg.data.test.img_prefix = '/mnt/nas4/diskl/MMG/Data/MMG-R1/CSAW_1/csaw_coco/test/'
-cfg.data.test.classes = ('lesion')
+# cfg.dataset_type = 'CsawDataset'
+# cfg.data.samples_per_gpu=2
+# cfg.data.workers_per_gpu=1
+# cfg.data.test.type = cfg.dataset_type
+# cfg.data.test.ann_file = '/mnt/c/Users/11351/Desktop/datasets/csaw_coco/test/annotation_coco.json'
+# cfg.data.test.img_prefix = '/mnt/c/Users/11351/Desktop/datasets/csaw_coco/test/'
+# cfg.data.test.classes = ('lesion',)
 
-cfg.data.train.ann_file = '/mnt/nas4/diskl/MMG/Data/MMG-R1/CSAW_1/csaw_coco/train/annotation_coco.json'
-cfg.data.train.img_prefix = '/mnt/nas4/diskl/MMG/Data/MMG-R1/CSAW_1/csaw_coco/train/'
-cfg.data.test.classes = ('lesion')
+# cfg.data.train.type = cfg.dataset_type
+# cfg.data.train.ann_file = '/mnt/c/Users/11351/Desktop/datasets/csaw_coco/train/annotation_coco.json'
+# cfg.data.train.img_prefix = '/mnt/c/Users/11351/Desktop/datasets/csaw_coco/train/'
+# cfg.data.test.classes = ('lesion',)
 
-
-cfg.data.val.ann_file = '/mnt/nas4/diskl/MMG/Data/MMG-R1/CSAW_1/csaw_coco/val/annotation_coco.json'
-cfg.data.val.img_prefix = '/mnt/nas4/diskl/MMG/Data/MMG-R1/CSAW_1/csaw_coco/val/'
-cfg.data.test.classes = ('lesion')
+# cfg.data.val.type = cfg.dataset_type
+# cfg.data.val.ann_file = '/mnt/c/Users/11351/Desktop/datasets/csaw_coco/val/annotation_coco.json'
+# cfg.data.val.img_prefix = '/mnt/c/Users/11351/Desktop/datasets/csaw_coco/val/'
+# cfg.data.test.classes = ('lesion',)
 
 # modify num classes of the model in box head and mask head
 cfg.model.roi_head.bbox_head.num_classes = 1
@@ -49,7 +51,7 @@ cfg.checkpoint_config.interval = 12
 # Set seed thus the results are more reproducible
 cfg.seed = 0
 set_random_seed(0, deterministic=False)
-cfg.gpu_ids = [1]
+cfg.gpu_ids = [0]
 cfg.device='cuda'
 # We can also use tensorboard to log the training process
 cfg.log_config.hooks = [

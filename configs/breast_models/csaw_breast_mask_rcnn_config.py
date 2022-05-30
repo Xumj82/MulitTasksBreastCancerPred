@@ -41,7 +41,7 @@ train_pipeline = [
     dict(type='Collect', keys=['img','gt_img_label','gt_bboxes', 'gt_labels', 'gt_masks']),
 ]
 test_pipeline = [
-    dict(type='LoadImageFromFile'),
+    dict(type='LoadMMImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
         img_scale=(1333, 800),
@@ -55,7 +55,31 @@ test_pipeline = [
             dict(type='Collect', keys=['img']),
         ])
 ]
+
+dataset_type = 'CocoDataset'
+classes = ('lesion',)
 data = dict(
-    train=dict(pipeline=train_pipeline),
-    val=dict(pipeline=test_pipeline),
-    test=dict(pipeline=test_pipeline))
+    samples_per_gpu=2,
+    workers_per_gpu=2,
+    train=dict(
+        pipeline=train_pipeline,
+        type=dataset_type,
+        # 将类别名字添加至 `classes` 字段中
+        classes=classes,
+        ann_file= '/mnt/c/Users/11351/Desktop/datasets/csaw_coco/train/annotation_coco.json',
+        img_prefix='/mnt/c/Users/11351/Desktop/datasets/csaw_coco/train/'),
+    val=dict(
+        pipeline=test_pipeline,
+        type=dataset_type,
+        # 将类别名字添加至 `classes` 字段中
+        classes=classes,
+        ann_file='/mnt/c/Users/11351/Desktop/datasets/csaw_coco/val/annotation_coco.json',
+        img_prefix='/mnt/c/Users/11351/Desktop/datasets/csaw_coco/val/'),
+    test=dict(
+        pipeline=test_pipeline,
+        type=dataset_type,
+        # 将类别名字添加至 `classes` 字段中
+        classes=classes,
+        ann_file='/mnt/c/Users/11351/Desktop/datasets/csaw_coco/val/annotation_coco.json',
+        img_prefix='/mnt/c/Users/11351/Desktop/datasets/csaw_coco/val/')
+    )

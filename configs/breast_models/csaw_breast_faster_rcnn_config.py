@@ -1,11 +1,21 @@
 # model settings
 pretrained = 'checkpoints/resnext50_32x4d_b32x8_imagenet_20210429-56066e27.pth'
 model = dict(
-    type='FastRCNN',
+    type='FasterRCNN',
     backbone=dict(
+        # type='ResNet',
+        # depth=50,
+        # num_stages=4,
+        # out_indices=(0, 1, 2, 3),
+        # frozen_stages=4,
+        # norm_cfg=dict(type='BN', requires_grad=True),
+        # norm_eval=True,
+        # style='pytorch',
+        # init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')
         type='ResNeXt',
         depth=50,
         num_stages=4,
+        frozen_stages = 4,
         out_indices=(0, 1, 2, 3),
         groups=32,
         base_width=4,
@@ -17,6 +27,22 @@ model = dict(
         in_channels=[256, 512, 1024, 2048],
         out_channels=256,
         num_outs=5),
+    rpn_head=dict(
+        type='RPNHead',
+        in_channels=256,
+        feat_channels=256,
+        anchor_generator=dict(
+            type='AnchorGenerator',
+            scales=[8],
+            ratios=[0.5, 1.0, 2.0],
+            strides=[4, 8, 16, 32, 64]),
+        bbox_coder=dict(
+            type='DeltaXYWHBBoxCoder',
+            target_means=[.0, .0, .0, .0],
+            target_stds=[1.0, 1.0, 1.0, 1.0]),
+        loss_cls=dict(
+            type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0),
+        loss_bbox=dict(type='L1Loss', loss_weight=1.0)),
     roi_head=dict(
         type='StandardRoIHead',
         bbox_roi_extractor=dict(
@@ -29,7 +55,7 @@ model = dict(
             in_channels=256,
             fc_out_channels=1024,
             roi_feat_size=7,
-            num_classes=80,
+            num_classes=1,
             bbox_coder=dict(
                 type='DeltaXYWHBBoxCoder',
                 target_means=[0., 0., 0., 0.],
@@ -40,6 +66,28 @@ model = dict(
             loss_bbox=dict(type='L1Loss', loss_weight=1.0))),
     # model training and testing settings
     train_cfg=dict(
+        rpn=dict(
+            assigner=dict(
+                type='MaxIoUAssigner',
+                pos_iou_thr=0.7,
+                neg_iou_thr=0.3,
+                min_pos_iou=0.3,
+                match_low_quality=True,
+                ignore_iof_thr=-1),
+            sampler=dict(
+                type='RandomSampler',
+                num=256,
+                pos_fraction=0.5,
+                neg_pos_ub=-1,
+                add_gt_as_proposals=False),
+            allowed_border=-1,
+            pos_weight=-1,
+            debug=False),
+        rpn_proposal=dict(
+            nms_pre=2000,
+            max_per_img=1000,
+            nms=dict(type='nms', iou_threshold=0.7),
+            min_bbox_size=0),
         rcnn=dict(
             assigner=dict(
                 type='MaxIoUAssigner',
@@ -57,15 +105,23 @@ model = dict(
             pos_weight=-1,
             debug=False)),
     test_cfg=dict(
+        rpn=dict(
+            nms_pre=1000,
+            max_per_img=1000,
+            nms=dict(type='nms', iou_threshold=0.7),
+            min_bbox_size=0),
         rcnn=dict(
             score_thr=0.05,
             nms=dict(type='nms', iou_threshold=0.5),
-            max_per_img=100)))
+            max_per_img=100)
+        # soft-nms is also supported for rcnn testing
+        # e.g., nms=dict(type='soft_nms', iou_threshold=0.5, min_score=0.05)
+    ))
+
 
 
 # dataset settings
-dataset_type = 'CsawDataset'
-data_root = '/mnt/nas4/diskl/MMG/Data/MMG-R1/CSAW_1/csaw_coco/'
+
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 train_pipeline = [
@@ -93,20 +149,28 @@ test_pipeline = [
             dict(type='Collect', keys=['img']),
         ])
 ]
+
+dataset_type = 'CocoDataset'
+classes = ('lesion',)
+data_root = '/mnt/c/Users/11351/Desktop/datasets/csaw_coco/'
+
 data = dict(
-    samples_per_gpu=2,
-    workers_per_gpu=2,
+    samples_per_gpu=1,
+    workers_per_gpu=1,
     train=dict(
+        classes=classes,
         type=dataset_type,
         ann_file=data_root + 'train/annotation_coco.json',
         img_prefix=data_root + 'train/',
         pipeline=train_pipeline),
     val=dict(
+        classes=classes,
         type=dataset_type,
         ann_file=data_root + 'val/annotation_coco.json',
         img_prefix=data_root + 'val/',
         pipeline=test_pipeline),
     test=dict(
+        classes=classes,
         type=dataset_type,
         ann_file=data_root + 'test/annotation_coco.json',
         img_prefix=data_root + '/test/',
@@ -142,7 +206,7 @@ log_level = 'INFO'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]
-work_dir = './detection/csaw_fast_rcnn/'
+work_dir = 'logs/csaw_faster_rcnn'
 # disable opencv multithreading to avoid system being overloaded
 opencv_num_threads = 0
 # set multi-process start method as `fork` to speed up the training
