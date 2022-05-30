@@ -30,6 +30,9 @@ class CsawSet(Dataset):
 
         self.mask_files = glob(mask_dir+"/*.png")
         self.csaw_meta = pd.read_csv(csv_file)
+
+        patients = self.csaw_meta['anon_patientid'].unique()
+
         self.items = []
         for mask_file in self.mask_files:
             mask_file_name = os.path.basename(mask_file)
