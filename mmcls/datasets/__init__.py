@@ -15,11 +15,12 @@ from .samplers import DistributedSampler, RepeatAugSampler
 from .voc import VOC
 from .ddsm_patch import DdsmPatch
 from .ddsm_breast import DdsmBreast
+from .csaw_breast import CsawBreast
 
 __all__ = [
     'BaseDataset', 'ImageNet', 'CIFAR10', 'CIFAR100', 'MNIST', 'FashionMNIST',
     'VOC', 'MultiLabelDataset', 'build_dataloader', 'build_dataset','DdsmPatch','DdsmBreast',
     'DistributedSampler', 'ConcatDataset', 'RepeatDataset',
     'ClassBalancedDataset', 'DATASETS', 'PIPELINES', 'ImageNet21k', 'SAMPLERS',
-    'build_sampler', 'RepeatAugSampler', 'KFoldDataset', 'CUB', 'CustomDataset'
+    'build_sampler', 'RepeatAugSampler', 'KFoldDataset', 'CUB', 'CustomDataset','CsawBreast'
 ]

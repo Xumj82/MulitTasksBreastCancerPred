@@ -87,7 +87,7 @@ def crop_borders(img,border_size=(0.01,0.04,0.01,0.04)):
     
     return cropped_img
 
-def HorizontalFlip(mask):
+def horizontal_flip(img, mask):
     
     '''
     This function figures out how to flip (also entails whether
@@ -125,11 +125,9 @@ def HorizontalFlip(mask):
     bottom_sum = sum(row_sum[y_center:-1])
     
     if left_sum < right_sum:
-        horizontal_flip = True
-    else:
-        horizontal_flip = False
-        
-    return horizontal_flip
+        img = cv2.flip(img, 1)
+
+    return img
 
 def generate_new_meta():
     calc_train = pd.read_csv('csv/calc_case_description_train_set.csv')
@@ -207,14 +205,12 @@ def read_resize_img(fname, target_size=None, target_height=None,
                     ):
     '''Read an image (.png, .jpg, .dcm) and resize it to target size.
     '''
-    if target_size is None and target_height is None:
-        raise Exception('One of [target_size, target_height] must not be None')
+    # if target_size is None and target_height is None:
+    #     raise Exception('One of [target_size, target_height] must not be None')
     if path.splitext(fname)[1] == '.dcm':
         img = pydicom.dcmread(fname).pixel_array
         if gs_255:
             img = convert_to_8bit(img)
-        else:
-            img = convert_to_16bit(img)
     else:
         if gs_255:
             img = cv2.imread(fname, cv2.IMREAD_GRAYSCALE)
@@ -230,6 +226,8 @@ def read_resize_img(fname, target_size=None, target_height=None,
         img = cv2.resize(
             img, dsize=(target_width, target_height), 
             interpolation=cv2.INTER_CUBIC)
+        if not gs_255:
+            img = convert_to_16bit(img)
     if crop_borders_size is not None:
         img = crop_borders(img,crop_borders_size)
     img = img.astype('float32')
@@ -312,7 +310,7 @@ def segment_breast(img, low_int_threshold=0.05, crop=True, erosion= False):
     x,y,w,h = cv2.boundingRect(contours[idx])
     if crop:
         img_breast_only = img_breast_only[y:y+h, x:x+w]
-    return img_breast_only, (x,y,w,h)
+    return img_breast_only, (x,y,w,h), breast_mask
 
 def overlap_patch_roi(patch_center, patch_size, roi_mask, 
                      cutoff=.5):
