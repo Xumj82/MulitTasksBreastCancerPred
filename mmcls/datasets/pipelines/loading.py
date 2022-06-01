@@ -94,7 +94,7 @@ class LoadMMImageFromFile:
                  to_float32=False,
                  color_type='color',
                  channel_order='bgr',
-                 file_client_args=dict(backend='disk')):
+                 file_client_args=dict(backend='lmdb')):
         self.img_label = img_label
         self.to_float32 = to_float32
         self.color_type = color_type
@@ -113,24 +113,20 @@ class LoadMMImageFromFile:
         """
 
         if self.file_client is None:
-            self.file_client = mmcv.FileClient(**self.file_client_args)
+            self.file_client = mmcv.FileClient(db_path = results['img_prefix'],**self.file_client_args)
 
-        if results['img_prefix'] is not None:
-            filename = osp.join(results['img_prefix'],
-                                results['img_info']['filename'])
-        else:
-            filename = results['img_info']['filename']
-
-        img = cv2.imread(filename, cv2.IMREAD_ANYDEPTH)
-        img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
-        img = img.astype(np.float32)
+        filename = results['img_info']['filename']
+        img_bytes = self.file_client.get(filename)
+        img_np = np.frombuffer(img_bytes, np.uint16)
+        img_np = img_np.reshape(results['img_shape'])
+        img_np = np.repeat(img_np[:, :, np.newaxis], 3, axis=2)/65535*255
 
 
         results['filename'] = filename
         results['ori_filename'] = results['img_info']['filename']
-        results['img'] = img
-        results['img_shape'] = img.shape
-        results['ori_shape'] = img.shape
+        results['img'] = img_np
+        # results['img_shape'] = img_np.shape
+        results['ori_shape'] = img_np.shape
         results['img_fields'] = ['img']
         return results
 

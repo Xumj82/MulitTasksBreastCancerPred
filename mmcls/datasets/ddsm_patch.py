@@ -11,6 +11,7 @@ class DdsmPatch(BaseDataset):
     # IMG_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif')
     def __init__(self,
                  data_prefix: str,
+                 img_shape: tuple,
                  pipeline: Sequence = (),
                  classes: Union[str, Sequence[str], None] = None,
                  ann_file: Optional[str] = None,
@@ -19,6 +20,7 @@ class DdsmPatch(BaseDataset):
                  test_mode: bool = False,
                  random_state: int = 32,):
         self.split = split
+        self.img_shape = img_shape
         self.val_size = val_size
         self.random_state = random_state
         super().__init__(
@@ -55,10 +57,11 @@ class DdsmPatch(BaseDataset):
         if self.split:
             train_sp, val_sp = self.train_test_split_on_patient(samples, test_size=self.val_size, random_state=self.random_state)
             samples = val_sp if self.test_mode else train_sp
+        info = {'img_prefix': self.data_prefix}
+        info['img_shape'] = self.img_shape
         if len(self.CLASSES) == 3:
-            for img_id,patch_id,type,pathology,full_img,ROI_img in samples.values.tolist():
-                info = {'img_prefix': self.data_prefix}
-                info['img_info'] = {'filename': type+'/'+patch_id+'.png'}
+            for patientid,img_id,patch_id,type,pathology,full_img,ROI_img in samples.values.tolist():
+                info['img_info'] = {'filename': patch_id}
                 info['gt_label'] = np.array(0, dtype=np.int64)                
                 if type == 'bkg':
                     info['gt_label'] = np.array(0, dtype=np.int64)
@@ -68,10 +71,8 @@ class DdsmPatch(BaseDataset):
                     info['gt_label'] = np.array(2, dtype=np.int64)
                 data_infos.append(info)
         if len(self.CLASSES) == 5:
-            for img_id,patch_id,type,pathology,full_img,ROI_img in samples.values.tolist():
-                info = {'img_prefix': self.data_prefix}
-                info['img_info'] = {'filename':  type+'/'+patch_id+'.png'}
-                
+            for patientid,img_id,patch_id,type,pathology,full_img,ROI_img in samples.values.tolist():
+                info['img_info'] = {'filename': patch_id}
                 if type == 'bkg':
                     info['gt_label'] = np.array(0, dtype=np.int64)
                 if type == 'calcification' and pathology!='MALIGNANT':

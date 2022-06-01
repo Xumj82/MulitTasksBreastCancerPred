@@ -24,6 +24,7 @@ model = dict(
 
 # dataset settings
 dataset_type = 'DdsmPatch'
+img_shape = (224, 224)
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 train_pipeline = [
@@ -51,22 +52,25 @@ data = dict(
     train=dict(
         classes = ('bkg','be_calc','be_mass','ma_calc','ma_mass'),
         type=dataset_type,
+        img_shape = img_shape,
         split = True,
-        data_prefix='/mnt/c/Users/11351/Desktop/patch_set_1150_224/train',
+        data_prefix='/mnt/c/Users/11351/Desktop/patch_set_1150_224/patch_set',
         ann_file='/mnt/c/Users/11351/Desktop/patch_set_1150_224/train_meta.csv',
         pipeline=train_pipeline),
     val=dict(
         classes = ('bkg','be_calc','be_mass','ma_calc','ma_mass'),
         type=dataset_type,
+        img_shape = img_shape,
         split = True,
-        data_prefix='/mnt/c/Users/11351/Desktop/patch_set_1150_224/train',
+        data_prefix='/mnt/c/Users/11351/Desktop/patch_set_1150_224/patch_set',
         ann_file='/mnt/c/Users/11351/Desktop/patch_set_1150_224/train_meta.csv',
         pipeline=test_pipeline),
     test=dict(
+        img_shape = img_shape,
         # replace `data/val` with `data/test` for standard test
         classes = ('bkg','be_calc','be_mass','ma_calc','ma_mass'),
         type=dataset_type,
-        data_prefix='/mnt/c/Users/11351/Desktop/patch_set_1150_224/test',
+        data_prefix='/mnt/c/Users/11351/Desktop/patch_set_1150_224/patch_set',
         ann_file='/mnt/c/Users/11351/Desktop/patch_set_1150_224/test_meta.csv',
         pipeline=test_pipeline))
 # hooks

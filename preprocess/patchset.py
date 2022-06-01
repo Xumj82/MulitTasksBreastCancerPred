@@ -1,3 +1,4 @@
+import lmdb
 import cv2
 import random
 import os
@@ -54,7 +55,7 @@ class PatchSet(Dataset):
         lesions = self.roi_df[self.roi_df['image file path']==full_img_path]
         full_img = read_resize_img(path.join(self.img_dir,full_img_path), target_size =self.target_size,gs_255=self.gs_255)
         # show_img_cv(full_img, title=full_img_path)
-        full_img,bbox = segment_breast(full_img)
+        full_img,bbox,_ = segment_breast(full_img)
         img = add_img_margins(full_img, self.patch_size//2+self.jitter)
         roi_areas = []
         
@@ -181,8 +182,12 @@ class PatchSet(Dataset):
     def push_to_lmdb(self, patch_id, patch_img):
         self.txn.put(key = patch_id.encode('ascii'), value = patch_img)
 
-    def get_all_patches(self):
-        # self.env = lmdb.open(self.lmdbfile, map_size=1099511627776)
+    def get_all_patches(self, verbose=False):
+        env = lmdb.open(os.path.join(self.out_dir,'patch_set'), map_size=1099511627776)
+        if verbose:
+            os.makedirs(os.path.join(self.out_dir,'bkg'),exist_ok=True)
+            os.makedirs(os.path.join(self.out_dir,'calcification'),exist_ok=True)
+            os.makedirs(os.path.join(self.out_dir,'mass'),exist_ok=True)
         fields=['img_id','patch_id','type','pathology','full_img','ROI_img']
         with open(self.out_csv, 'w') as f:
             writer = csv.writer(f)
@@ -191,22 +196,23 @@ class PatchSet(Dataset):
             writer = csv.writer(f)
             with tqdm(total=len(self)) as pbar:
                 for i in range(len(self)):
-                    # self.txn = self.env.begin(write=True)   
+                    txn = env.begin(write=True)   
                     try:                
                         img_id,patches = self[i]
                         for idx, patch in enumerate(patches):
                             patch_id = img_id+'_'+patch['type']+'_'+str(idx)
-                            if not os.path.exists(os.path.join(self.out_dir,patch['type'])):
-                                os.makedirs(os.path.join(self.out_dir,patch['type']))
-                            cv2.imwrite(os.path.join(self.out_dir,patch['type'],patch_id+".png"),patch['data'])
+                            txn.put(str(patch_id).encode(), patch['data'].tobytes(order='C'))
+                            if verbose:
+                                verbose_img = convert_to_8bit(patch['data'])
+                                cv2.imwrite(os.path.join(self.out_dir,patch['type'],patch_id+".png"),verbose_img)
                             # self.txn.put(patch_id.encode("ascii"), patch['data'])
                             writer.writerow([img_id, patch_id,patch['type'],patch['pathology'],self.full_images[i],patch['roi_path']])
                     except Exception as e:
                         print("{} : {}".format(i,e))
-                    # self.txn.commit()
+                    txn.commit()
                     pbar.update(1)
         
-        # self.env.close()
+        env.close()
         # records = pd.DataFrame(self.sample_records,columns=['img_id','patch_id','type','pathology','full_img','ROI_img'])
         # records.to_csv(self.out_csv,index=False)
 
