@@ -3,15 +3,6 @@ pretrained = 'checkpoints/resnext50_32x4d_b32x8_imagenet_20210429-56066e27.pth'
 model = dict(
     type='FasterRCNN',
     backbone=dict(
-        # type='ResNet',
-        # depth=50,
-        # num_stages=4,
-        # out_indices=(0, 1, 2, 3),
-        # frozen_stages=4,
-        # norm_cfg=dict(type='BN', requires_grad=True),
-        # norm_eval=True,
-        # style='pytorch',
-        # init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')
         type='ResNeXt',
         depth=50,
         num_stages=4,
