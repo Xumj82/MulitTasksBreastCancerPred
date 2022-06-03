@@ -1,7 +1,10 @@
 import mmcv
 import numpy as np
 import pandas as pd
+import random
 from typing import Optional, Sequence, Union
+
+from torch import rand
 from .builder import DATASETS
 from .base_dataset import BaseDataset
 from mmdet.datasets.api_wrappers import COCO, COCOeval
@@ -12,11 +15,15 @@ class CsawBreast(BaseDataset):
     def __init__(self,
                  data_prefix: str,
                  pipeline: Sequence = (),
+                 seed:int=32,
+                 sample_rate: float=0.01,
                  classes: Union[str, Sequence[str], None] = None,
                  ann_file: Optional[str] = None,
                  test_mode: bool = False,
                  file_client_args: Optional[dict] = None):
         self.data_infos = []
+        self.sample_rate = sample_rate
+        random.seed(seed)
         super().__init__(
             data_prefix=data_prefix,
             pipeline=pipeline,
@@ -28,7 +35,8 @@ class CsawBreast(BaseDataset):
         assert isinstance(self.ann_file, str)
         data_infos = []
         df = pd.read_csv(self.ann_file)
-        patients = df['anon_patientid'].unique()
+        patients = df['anon_patientid'].unique()[0:100]
+        patients = random.sample(patients, int(len(patients)*self.sample_rate))
         for p in patients:
             p_rows = df[df['anon_patientid']==p]
 
