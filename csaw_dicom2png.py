@@ -8,19 +8,20 @@ from tqdm import tqdm
 from glob import glob
 from random import sample
 from argparse import ArgumentParser
-from lib.preprocess_utils import read_resize_img, segment_breast, horizontal_flip,convert_to_8bit,convert_to_16bit
+from lib.preprocess_utils import read_resize_img, segment_breast, horizontal_flip,convert_to_8bit,convert_to_16bit,crop_borders
 
 SEED = 32
 RESIZE = (1120, 896)
 random.seed(SEED)
 def process_pipeline(img_file_path):
     target_height, target_width = RESIZE
-    img = read_resize_img(img_file_path, crop_borders_size=(0.06,0.06,0,0))
+    img = read_resize_img(img_file_path, )
+    img = crop_borders(img,border_size=(0,0,0.06,0.06,))
     img_segment,_,breast_mask = segment_breast(img)
     img_filped = horizontal_flip(img_segment,breast_mask)
     img_resized = cv2.resize(img_filped,dsize=(target_width, target_height), 
             interpolation=cv2.INTER_CUBIC)
-    img_resized = convert_to_16bit(img_resized)
+    img_resized = convert_to_16bit(img_resized).astype(np.uint16)
     return img_resized
 
 def main(verbose):
@@ -68,7 +69,7 @@ if __name__ == '__main__':
         type=str)
     parser.add_argument('--sample_rate',
         help='from 0 to 1',
-        default=0.01,type=int)
+        default=0.1,type=int)
     parser.add_argument('--output_dir',default='/mnt/nas4/diskl/MMG/Data/MMG-R1/SAMPLE_DATA',type=str)
     parser.add_argument('--verbose',help='generate png file',default=True,type=bool)
     args = parser.parse_args()
