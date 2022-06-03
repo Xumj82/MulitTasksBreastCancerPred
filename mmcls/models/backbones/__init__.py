@@ -34,6 +34,7 @@ from .van import VAN
 from .vgg import VGG
 from .vision_transformer import VisionTransformer
 from .resnet_dou_view import ResNetDouView
+from .resnet_no_pool import ResNetNoPool
 __all__ = [
     'LeNet5', 'AlexNet', 'VGG', 'RegNet', 'ResNet', 'ResNeXt', 'ResNetV1d',
     'ResNeSt', 'ResNet_CIFAR', 'SEResNet', 'SEResNeXt', 'ShuffleNetV1',
@@ -42,5 +43,5 @@ __all__ = [
     'Conformer', 'MlpMixer', 'DistilledVisionTransformer', 'PCPVT', 'SVT',
     'EfficientNet', 'ConvNeXt', 'HRNet', 'ResNetV1c', 'ConvMixer',
     'CSPDarkNet', 'CSPResNet', 'CSPResNeXt', 'CSPNet', 'RepMLPNet',
-    'PoolFormer', 'DenseNet', 'VAN','ResNetDouView'
+    'PoolFormer', 'DenseNet', 'VAN','ResNetDouView','ResNetNoPool'
 ]

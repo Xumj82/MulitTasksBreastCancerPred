@@ -183,30 +183,26 @@ class LoadBreastImageFromFile:
         """
 
         if self.file_client is None:
-            self.file_client = mmcv.FileClient(**self.file_client_args)
+            self.file_client = mmcv.FileClient(db_path = results['img_prefix'],**self.file_client_args)
 
-        if results['img_prefix'] is not None:
-            filenames = [osp.join(results['img_prefix'],filename) for filename in results['img_info']['filenames']]
-        else:
-            filenames = [filename for filename in results['img_info']['filenames']]
-        imgs = []
-        for f in filenames:
-            img_bytes = self.file_client.get(f)
-            img = mmcv.imfrombytes(img_bytes, flag=self.color_type)
-            img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
-            img = img.astype(np.float32)
-            imgs.append(img)
+        cc_byte = self.file_client.get(results['img_info']['cc_view'])
+        mlo_byte = self.file_client.get(results['img_info']['mlo_view'])
+
+        cc_img = np.frombuffer(cc_byte, np.uint16)
+        mlo_img = np.frombuffer(mlo_byte, np.uint16)
+        cc_img = cc_img.reshape(results['img_shape'])
+        mlo_img = mlo_img.reshape(results['img_shape'])
 
         # img = cv2.imread(filename, cv2.IMREAD_ANYDEPTH)
         
         # img = img.astype(np.float32)
 
 
-        results['filenames'] = filenames
-        results['ori_filename'] = results['img_info']['filename']
-        results['img'] = img
-        results['img_shape'] = img.shape
-        results['ori_shape'] = img.shape
+        # results['filenames'] = filenames
+        # results['ori_filename'] = results['img_info']['filename']
+        results['img'] = [cc_img,mlo_img]
+        results['img_shape'] = results['img_shape']
+        results['ori_shape'] = results['img_shape']
         results['img_fields'] = ['img']
         return results
 
