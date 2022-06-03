@@ -119,7 +119,7 @@ class LoadMMImageFromFile:
         img_bytes = self.file_client.get(filename)
         img_np = np.frombuffer(img_bytes, np.uint16)
         img_np = img_np.reshape(results['img_shape'])
-        img_np = np.repeat(img_np[:, :, np.newaxis], 3, axis=2)/65535
+        # img_np = np.repeat(img_np[:, :, np.newaxis], 3, axis=2)/65535
 
 
         results['filename'] = filename

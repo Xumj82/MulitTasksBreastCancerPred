@@ -873,6 +873,37 @@ class CenterCrop(object):
         repr_str += f', backend={self.backend})'
         return repr_str
 
+@PIPELINES.register_module()
+class LinearNormalize(object):
+    """Normalize the image.
+
+    Args:
+        mean (sequence): Mean values of 3 channels.
+        std (sequence): Std values of 3 channels.
+        to_rgb (bool): Whether to convert the image from BGR to RGB,
+            default is true.
+    """
+
+    def __init__(self, max_val=65535, to_rgb=True):
+        self.max_val = max_val
+        self.to_rgb = to_rgb
+
+    def __call__(self, results):
+        for key in results.get('img_fields', ['img']):
+            img = results[key]/self.max_val
+            if self.to_rgb:
+                img = np.repeat(img[:, :, np.newaxis], 3, axis=2)
+            results[key] = img.astype(np.float32)
+        results['img_norm_cfg'] = dict(
+            mean=0.4, std=0.2, to_rgb=self.to_rgb)
+        return results
+
+    def __repr__(self):
+        repr_str = self.__class__.__name__
+        repr_str += f'(mean={list(self.mean)}, '
+        repr_str += f'std={list(self.std)}, '
+        repr_str += f'to_rgb={self.to_rgb})'
+        return repr_str
 
 @PIPELINES.register_module()
 class Normalize(object):

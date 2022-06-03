@@ -8,11 +8,11 @@ from .formatting import (Collect, ImageToTensor, ToNumpy, ToPIL, ToTensor,
                          Transpose, to_tensor)
 from .loading import LoadImageFromFile,LoadMMImageFromFile
 from .transforms import (CenterCrop, ColorJitter, Lighting, Normalize, Pad,
-                         RandomCrop, RandomErasing, RandomFlip,
+                         RandomCrop, RandomErasing, RandomFlip,LinearNormalize,
                          RandomGrayscale, RandomResizedCrop, Resize,ElasticTransform)
 __all__ = [
     'Compose', 'to_tensor', 'ToTensor', 'ImageToTensor', 'ToPIL', 'ToNumpy',
-    'Transpose', 'Collect', 'LoadImageFromFile', 'Resize', 'CenterCrop','LoadMMImageFromFile'
+    'Transpose', 'Collect', 'LoadImageFromFile', 'Resize', 'CenterCrop','LoadMMImageFromFile','LinearNormalize'
     'RandomFlip', 'Normalize', 'RandomCrop', 'RandomResizedCrop',
     'RandomGrayscale', 'Shear', 'Translate', 'Rotate', 'Invert',
     'ColorTransform', 'Solarize', 'Posterize', 'AutoContrast', 'Equalize',

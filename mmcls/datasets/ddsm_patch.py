@@ -50,17 +50,15 @@ class DdsmPatch(BaseDataset):
         assert isinstance(self.ann_file, str)
 
         data_infos = []
-        # with open(self.ann_file) as f:
-        #     samples = [x.strip().split(',') for x in f.readlines()]
-        #     samples.pop(0)
         samples = pd.read_csv(self.ann_file)
         if self.split:
             train_sp, val_sp = self.train_test_split_on_patient(samples, test_size=self.val_size, random_state=self.random_state)
             samples = val_sp if self.test_mode else train_sp
-        info = {'img_prefix': self.data_prefix}
-        info['img_shape'] = self.img_shape
+
         if len(self.CLASSES) == 3:
             for patientid,img_id,patch_id,type,pathology,full_img,ROI_img in samples.values.tolist():
+                info = {'img_prefix': self.data_prefix}
+                info['img_shape'] = self.img_shape
                 info['img_info'] = {'filename': patch_id}
                 info['gt_label'] = np.array(0, dtype=np.int64)                
                 if type == 'bkg':
@@ -72,6 +70,8 @@ class DdsmPatch(BaseDataset):
                 data_infos.append(info)
         if len(self.CLASSES) == 5:
             for patientid,img_id,patch_id,type,pathology,full_img,ROI_img in samples.values.tolist():
+                info = {'img_prefix': self.data_prefix}
+                info['img_shape'] = self.img_shape
                 info['img_info'] = {'filename': patch_id}
                 if type == 'bkg':
                     info['gt_label'] = np.array(0, dtype=np.int64)
