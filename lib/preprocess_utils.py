@@ -5,6 +5,7 @@ from pathlib import Path
 import cv2
 import torch
 import pydicom
+import mmcv
 import numpy as np
 import pandas as pd
 from PIL import Image
@@ -15,6 +16,146 @@ from torch.utils.data import Dataset
 
 
 ## put you dir here 
+def process_pipeline(img_file_path,resize_shape,crop_borders_size):
+    target_height, target_width = resize_shape
+    img = read_resize_img(img_file_path, crop_borders_size=(0,0,0.04,0.04))
+    
+    img_segment,crop_rect,breast_mask = segment_breast(img)
+    breast_mask = crop_img(breast_mask, crop_rect)
+    img_segment,_ = remove_pectoral(img=img_segment,breast_mask=breast_mask,high_int_threshold=0.9,sm_kn_size=5)
+    img_filped = horizontal_flip(img_segment,breast_mask)
+    img_filped = clahe(img_filped.astype(np.uint16), 65535)
+    img_resized = cv2.resize(img_filped,dsize=(target_width, target_height), 
+            interpolation=cv2.INTER_CUBIC)
+    img_resized = convert_to_16bit(img_resized)/65535*255
+    img_resized = mmcv.image.imnormalize(img_resized,mean=np.array([123.675]),std=np.array([58.395]),to_rgb=False)
+    return img_resized
+
+def max_pix_val(dtype):
+    if dtype == np.dtype('uint8'):
+        maxval = 2**8 - 1
+    elif dtype == np.dtype('uint16'):
+        maxval = 2**16 - 1
+    else:
+        raise Exception('Unknown dtype found in input image array')
+    return maxval
+
+def select_largest_obj(img_bin, lab_val=255, fill_holes=False, 
+                        smooth_boundary=False, kernel_size=15):
+    '''Select the largest object from a binary image and optionally
+    fill holes inside it and smooth its boundary.
+    Args:
+        img_bin (2D array): 2D numpy array of binary image.
+        lab_val ([int]): integer value used for the label of the largest 
+                object. Default is 255.
+        fill_holes ([boolean]): whether fill the holes inside the largest 
+                object or not. Default is false.
+        smooth_boundary ([boolean]): whether smooth the boundary of the 
+                largest object using morphological opening or not. Default 
+                is false.
+        kernel_size ([int]): the size of the kernel used for morphological 
+                operation. Default is 15.
+    Returns:
+        a binary image as a mask for the largest object.
+    '''
+    n_labels, img_labeled, lab_stats, _ = \
+        cv2.connectedComponentsWithStats(img_bin, connectivity=8, 
+                                            ltype=cv2.CV_32S)
+    largest_obj_lab = np.argmax(lab_stats[1:, 4]) + 1
+    largest_mask = np.zeros(img_bin.shape, dtype=np.uint8)
+    largest_mask[img_labeled == largest_obj_lab] = lab_val
+    # import pdb; pdb.set_trace()
+    if fill_holes:
+        bkg_locs = np.where(img_labeled == 0)
+        bkg_seed = (bkg_locs[0][0], bkg_locs[1][0])
+        img_floodfill = largest_mask.copy()
+        h_, w_ = largest_mask.shape
+        mask_ = np.zeros((h_ + 2, w_ + 2), dtype=np.uint8)
+        cv2.floodFill(img_floodfill, mask_, seedPoint=bkg_seed, 
+                        newVal=lab_val)
+        holes_mask = cv2.bitwise_not(img_floodfill)  # mask of the holes.
+        largest_mask = largest_mask + holes_mask
+    if smooth_boundary:
+        kernel_ = np.ones((kernel_size, kernel_size), dtype=np.uint8)
+        largest_mask = cv2.morphologyEx(largest_mask, cv2.MORPH_OPEN, 
+                                        kernel_)
+        
+    return largest_mask
+
+def remove_pectoral(img, high_int_threshold=.9, 
+                    morph_kn_size=10, n_morph_op=7, sm_kn_size=25):
+    '''Remove the pectoral muscle region from an input image
+
+    Args:
+        img (2D array): input image as a numpy 2D array.
+        breast_mask (2D array):
+        high_int_threshold ([int]): a global threshold for high intensity 
+                regions such as the pectoral muscle. Default is 200.
+        morph_kn_size ([int]): kernel size for morphological operations 
+                such as erosions and dilations. Default is 3.
+        n_morph_op ([int]): number of morphological operations. Default is 7.
+        sm_kn_size ([int]): kernel size for final smoothing (i.e. opening). 
+                Default is 25.
+    Returns:
+        an output image with pectoral muscle region removed as a numpy 
+        2D array.
+    Notes: this has not been tested on .dcm files yet. It may not work!!!
+    '''
+    # Enhance contrast and then thresholding.
+    img_8u = convert_to_8bit(np.clip(img,0.4*65535, 0.5*65535)).astype(np.uint8)
+    # t1 = np.mean(img_8u)
+    # t2 = np.min(img_8u)
+    # img = convert_to_16bit(img)
+    # img_equ = cv2.equalizeHist(img_8u)
+    img_equ = img_8u
+    if high_int_threshold < 1.:
+        high_th = int(img_8u.max()*high_int_threshold)
+    else:
+        high_th = int(high_int_threshold)
+    maxval = max_pix_val(img_8u.dtype)
+    _, img_bin = cv2.threshold(img_equ, high_th, 
+                                maxval=maxval, type=cv2.THRESH_BINARY)
+    
+    
+    # pect_marker_img = np.zeros(img_bin.shape, dtype=np.int32)
+    # # Sure foreground (shall be pectoral).
+    # pect_mask_init = select_largest_obj(img_bin, lab_val=maxval, 
+    #                                             fill_holes=True, 
+    #                                             smooth_boundary=False)
+    
+    kernel_ = np.ones((morph_kn_size, morph_kn_size), dtype=np.uint8)
+    pect_mask_eroded = cv2.erode(img_bin, kernel_, 
+                                    iterations=n_morph_op)
+    # show_img(pect_mask_eroded)
+    idx,cont_areas,contours = get_max_connected_area(pect_mask_eroded)                                
+    pectoral = cv2.drawContours(
+        np.zeros_like(img_bin), contours, idx, 255, -1)  # fill the contour.
+    
+    pectoral = 255-pectoral
+    # pect_marker_img[pect_mask_eroded > 0] = 255
+    # # Sure background - breast.
+    # pect_mask_dilated = cv2.dilate(img_bin, kernel_, 
+    #                                 iterations=n_morph_op)
+    # show_img(pect_mask_dilated)
+    # pect_marker_img[pect_mask_dilated == 0] = 128
+    # # Sure background - pure background.
+    # pect_marker_img[breast_mask == 0] = 64
+    # # Watershed segmentation.
+    # img_equ_3c = cv2.cvtColor(img_equ, cv2.COLOR_GRAY2BGR)
+    # cv2.watershed(img_equ_3c, pect_marker_img)
+    # img_equ_3c[pect_marker_img == -1] = (0, 0, 255)
+    # # Extract only the breast and smooth.
+    # breast_only_mask = pect_marker_img.copy()
+    # breast_only_mask[breast_only_mask == -1] = 0
+    # breast_only_mask = breast_only_mask.astype(np.uint8)
+    # breast_only_mask[breast_only_mask != 128] = 0
+    # breast_only_mask[breast_only_mask == 128] = 255
+    # kernel_ = np.ones((sm_kn_size, sm_kn_size), dtype=np.uint8)
+    # breast_only_mask = cv2.morphologyEx(breast_only_mask, cv2.MORPH_OPEN, 
+    #                                     kernel_)
+    img_breast_only = cv2.bitwise_and(img,img,mask = pectoral)
+
+    return img_breast_only
 
 def clahe(img,max_pixel_val = 255,clip=2.0, tile=(8, 8)):
     
@@ -52,7 +193,7 @@ def clahe(img,max_pixel_val = 255,clip=2.0, tile=(8, 8)):
     )
     if max_pixel_val == 255:
         img = img.astype("uint8")
-    if max_pixel_val == 65525:
+    if max_pixel_val == 65535:
         img = img.astype("uint16")
     clahe_create = cv2.createCLAHE(clipLimit=clip, tileGridSize=tile)
     clahe_img = clahe_create.apply(img)
@@ -191,7 +332,7 @@ def convert_to_8bit(img):
     if np.max(img):
         img = img - np.min(img)
         img = img / np.max(img)
-    return (img * 255).astype(np.int32)
+    return (img * 255).astype(np.float32)
 
 def convert_to_16bit(img):
     if np.max(img):
@@ -199,23 +340,28 @@ def convert_to_16bit(img):
         img = img / np.max(img)
     return (img * 65535).astype(np.float32)
 
+def linear_nor(img):
+    if np.max(img):
+        img = img - np.min(img)
+        img = img / np.max(img)
+    return img
+
 def read_resize_img(fname, target_size=None, target_height=None, 
                     target_scale=None, gs_255=False, rescale_factor=None,
-                    crop_borders_size=None
-                    ):
+                    ) -> np.float32:
     '''Read an image (.png, .jpg, .dcm) and resize it to target size.
     '''
     # if target_size is None and target_height is None:
     #     raise Exception('One of [target_size, target_height] must not be None')
     if path.splitext(fname)[1] == '.dcm':
         img = pydicom.dcmread(fname).pixel_array
-        if gs_255:
-            img = convert_to_8bit(img)
     else:
-        if gs_255:
-            img = cv2.imread(fname, cv2.IMREAD_GRAYSCALE)
-        else:
-            img = cv2.imread(fname, cv2.IMREAD_UNCHANGED)
+        img = cv2.imread(fname, cv2.IMREAD_UNCHANGED)
+    # if gs_255:
+    #     img = convert_to_8bit(img)
+    # else:
+    #     img = convert_to_16bit(img)
+
     if target_height is not None:
         target_width = int(float(target_height)/img.shape[0]*img.shape[1])
     elif target_size is not None:
@@ -225,12 +371,7 @@ def read_resize_img(fname, target_size=None, target_height=None,
     if (target_height, target_width) != img.shape:
         img = cv2.resize(
             img, dsize=(target_width, target_height), 
-            interpolation=cv2.INTER_CUBIC)
-        if not gs_255:
-            img = convert_to_16bit(img)
-    if crop_borders_size is not None:
-        img = crop_borders(img,crop_borders_size)
-    img = img.astype('float32')
+            interpolation=cv2.INTER_CUBIC)            
     if target_scale is not None:
         img_max = img.max() if img.max() != 0 else target_scale
         img *= target_scale/img_max
@@ -316,13 +457,22 @@ def overlap_patch_roi(patch_center, patch_size, roi_mask,
                      cutoff=.5):
     black_img = np.zeros(roi_mask.shape)
     black_img[int(patch_center[1] - patch_size/2):patch_center[1] + int(patch_size/2), 
-                int(patch_center[0]- patch_size/2):patch_center[0] + int(patch_size/2)] = 1
+                int(patch_center[0]- patch_size/2):patch_center[0] + int(patch_size/2)] = 255
+
+
+    # cv2.imshow("grayscale image", black_img)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+
+    # cv2.imshow("grayscale image", roi_mask)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+
     roi_area = (roi_mask>0).sum()
     patch_area = (black_img>0).sum()
 
-    inter_img = roi_mask*black_img
-    inter_area = (inter_img >0).sum()
-
+    inter_area = (roi_mask*black_img>0).sum()
+    # print(inter_area, roi_area, patch_area, str(inter_area/roi_area > cutoff or inter_area/patch_area > cutoff))
     return (inter_area/roi_area > cutoff or inter_area/patch_area > cutoff)
 
 def draw_rect(img, sel_centers, patchsize):
