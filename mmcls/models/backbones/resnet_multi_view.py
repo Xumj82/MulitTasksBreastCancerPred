@@ -14,7 +14,7 @@ from .base_backbone import BaseBackbone
 from .resnet import ResNet
 
 @BACKBONES.register_module()
-class ResNetDouView(ResNet):
+class ResNetMultiView(ResNet):
     """ResNetV1c backbone.
 
     This variant is described in `Bag of Tricks.
@@ -24,13 +24,14 @@ class ResNetDouView(ResNet):
     in the input stem with three 3x3 convs.
     """
 
-    def __init__(self, **kwargs):
-        super(ResNetDouView, self).__init__(
+    def __init__(self,num_views=2,**kwargs):
+        self.num_views = num_views
+        super(ResNetMultiView, self).__init__(
             deep_stem=False, avg_down=False, **kwargs)
 
     def forward(self, x:Tensor):
-        x_shape = x.shape
-        x = x.reshape((-1,))
+        in_shape = x.shape
+        x = x.reshape((-1,in_shape[2],in_shape[3],in_shape[4]))
         if self.deep_stem:
             x = self.stem(x)
         else:
@@ -42,9 +43,14 @@ class ResNetDouView(ResNet):
         for i, layer_name in enumerate(self.res_layers):
             res_layer = getattr(self, layer_name)
             x = res_layer(x)
-            x = x.reshape(x_shape)
+            # x = x.reshape((in_shape[0],in_shape[1]*x.shape[1],x.shape[2],x.shape[3]))
             if i in self.out_indices:
                 outs.append(x)
+        
+        outs = [x.reshape((in_shape[0],in_shape[1]*x.shape[1],x.shape[2],x.shape[3])) for x in outs]
+        # for x in outs:
+        #     x = x.reshape((in_shape[0],in_shape[1]*x.shape[1],x.shape[2],x.shape[3]))
+
         return tuple(outs)
 
 # @BACKBONES.register_module()

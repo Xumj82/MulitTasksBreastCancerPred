@@ -884,15 +884,17 @@ class LinearNormalize(object):
             default is true.
     """
 
-    def __init__(self, max_val=65535, to_rgb=True):
+    def __init__(self, max_val=65535, to_rgb=True, rep_dim=-1):
         self.max_val = max_val
         self.to_rgb = to_rgb
+        self.rep_dim = rep_dim
 
     def __call__(self, results):
         for key in results.get('img_fields', ['img']):
             img = results[key]/self.max_val
             if self.to_rgb:
-                img = np.repeat(img[:, :, np.newaxis], 3, axis=2)
+                img = np.expand_dims(img, axis=self.rep_dim)
+                img = np.repeat(img, 3, axis=self.rep_dim)
             results[key] = img.astype(np.float32)
         results['img_norm_cfg'] = dict(
             mean=0.4, std=0.2, to_rgb=self.to_rgb)

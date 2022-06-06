@@ -186,13 +186,16 @@ class LoadBreastImageFromFile:
             self.file_client = mmcv.FileClient(db_path = results['img_prefix'],**self.file_client_args)
 
         cc_byte = self.file_client.get(results['img_info']['cc_view'])
-        # mlo_byte = self.file_client.get(results['img_info']['mlo_view'])
+        mlo_byte = self.file_client.get(results['img_info']['mlo_view'])
+        
+        if cc_byte is None or mlo_byte is None:
+            print(results['img_id'])
 
         cc_img = np.frombuffer(cc_byte, np.uint16)
         # mlo_img = np.frombuffer(mlo_byte, np.uint16)
         cc_img = cc_img.reshape(results['img_shape'])
-        # mlo_img = mlo_img.reshape(results['img_shape'])
-
+        mlo_img = mlo_img.reshape(results['img_shape'])
+        stack_img = np.stack([cc_img, mlo_img], axis=0)
         # img = cv2.imread(filename, cv2.IMREAD_ANYDEPTH)
         
         # img = img.astype(np.float32)
@@ -200,7 +203,7 @@ class LoadBreastImageFromFile:
 
         # results['filenames'] = filenames
         # results['ori_filename'] = results['img_info']['filename']
-        results['img'] = cc_img
+        results['img'] = stack_img
         results['img_shape'] = results['img_shape']
         results['ori_shape'] = results['img_shape']
         results['img_fields'] = ['img']
