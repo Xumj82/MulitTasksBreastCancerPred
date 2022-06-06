@@ -12,19 +12,25 @@ _base_ = [
 model = dict(
     backbone=dict(
         frozen_stages = -1,
-        init_cfg=dict(type='Pretrained', checkpoint='checkpoints/swin_tiny_epoch_6.pth',prefix='backbone')),
+        init_cfg=dict(type='Pretrained', checkpoint='checkpoints/epoch_8.pth',prefix='backbone')),
+    neck=dict(
+        type='ResNecks',
+        depth=2,
+        num_stages=2,
+        out_indices=(1, ),
+        style='pytorch'), 
     head=dict(
             type='LinearClsHead',
-            num_classes=5,
-            in_channels=2048,
+            num_classes=4,
+            in_channels=512,
             loss=dict(type='CrossEntropyLoss', loss_weight=1.0),
             topk=(1,),
-            init_cfg=dict(type='Pretrained', checkpoint='checkpoints/swin_tiny_epoch_6.pth',prefix='head')
+            init_cfg=dict(type='Pretrained', checkpoint='checkpoints/epoch_8.pth',prefix='head')
         )
     )
 
 # dataset settings
-dataset_type = 'DdsmPatch'
+dataset_type = 'CsawBreast'
 img_shape = (1120, 896)
 train_pipeline = [
     dict(type='LoadBreastImageFromFile'),
@@ -43,31 +49,29 @@ test_pipeline = [
 ]
 
 data = dict(
-    samples_per_gpu=64,
-    workers_per_gpu=12,
+    samples_per_gpu=1,
+    workers_per_gpu=1,
     train=dict(
         classes = ('lv1','lv2','lv3','lv4'),
         type=dataset_type,
         img_shape = img_shape,
-        split = True,
-        data_prefix='/mnt/nas4/diskl/MMG/Data/MMG-R1/SAMPLE_DATA_BREAST/csaw_breast_lv_set/',
-        ann_file='/mnt/nas4/diskl/MMG/Data/MMG-R1/SAMPLE_DATA_BREAST/breast_lv_csaw_set.csv',
+        data_prefix='/mnt/c/Users/11351/Desktop/datasets/csaw_breast_lv_set/',
+        ann_file='/mnt/c/Users/11351/Desktop/datasets/csaw_breast_lv_set/train_set.csv',
         pipeline=train_pipeline),
     val=dict(
         classes = ('lv1','lv2','lv3','lv4'),
         type=dataset_type,
         img_shape = img_shape,
-        split = True,
-        data_prefix='/mnt/nas4/diskl/MMG/Data/MMG-R1/SAMPLE_DATA_BREAST/csaw_breast_lv_set/',
-        ann_file='/mnt/nas4/diskl/MMG/Data/MMG-R1/SAMPLE_DATA_BREAST/breast_lv_csaw_set_test.csv',
+        data_prefix='/mnt/c/Users/11351/Desktop/datasets/csaw_breast_lv_set/',
+        ann_file='/mnt/c/Users/11351/Desktop/datasets/csaw_breast_lv_set/val_set.csv',
         pipeline=test_pipeline),
     test=dict(
         img_shape = img_shape,
         # replace `data/val` with `data/test` for standard test
         classes = ('lv1','lv2','lv3','lv4'),
         type=dataset_type,
-        data_prefix='/mnt/nas4/diskl/MMG/Data/MMG-R1/SAMPLE_DATA_BREAST/csaw_breast_lv_set/',
-        ann_file='/mnt/nas4/diskl/MMG/Data/MMG-R1/SAMPLE_DATA_BREAST/breast_lv_csaw_set_test.csv',
+        data_prefix='/mnt/c/Users/11351/Desktop/datasets/csaw_breast_lv_set/',
+        ann_file='/mnt/c/Users/11351/Desktop/datasets/csaw_breast_lv_set/test_set.csv',
         pipeline=test_pipeline))
 # hooks
 # custom_hooks = [dict(type="UnfreezeBackboneEpochBasedHook", unfreeze_epoch=3)]
@@ -94,5 +98,5 @@ optimizer_config = dict(grad_clip=None)
 # learning policy
 lr_config = dict(policy='step', step=[3,6])
 runner = dict(type='EpochBasedRunner', max_epochs=10)
-work_dir = 'logs/ddsm_patch_resnet50'
+work_dir = 'logs/csaw_breast_resnet50'
 evaluation = dict(interval=1, metric='accuracy',metric_options = dict(topk=(1,)))

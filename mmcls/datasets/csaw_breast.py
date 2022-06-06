@@ -15,12 +15,13 @@ class CsawBreast(BaseDataset):
     def __init__(self,
                  data_prefix: str,
                  pipeline: Sequence = (),
+                 img_shape: tuple =(),
                  seed:int=32,
                  classes: Union[str, Sequence[str], None] = None,
                  ann_file: Optional[str] = None,
                  test_mode: bool = False,
                  file_client_args: Optional[dict] = None):
-        random.seed(seed)
+        self.img_shape = img_shape
         super().__init__(
             data_prefix=data_prefix,
             pipeline=pipeline,
@@ -33,10 +34,11 @@ class CsawBreast(BaseDataset):
         data_infos = []
         df = pd.read_csv(self.ann_file)
         for idx,row in df.iterrows():
-            cc_view = row['cc_view']
-            mlo_view = row['mlo_view']
+            cc_view = row['id']
+            mlo_view = row['id']
             rad_time = row['rad_time']
             info = {'img_prefix': self.data_prefix}
+            info['img_shape'] = self.img_shape
             info['img_info'] = {'cc_view':cc_view,'mlo_view':mlo_view}
             info['gt_label'] = np.array(rad_time-1, dtype=np.int64)
             data_infos.append(info)

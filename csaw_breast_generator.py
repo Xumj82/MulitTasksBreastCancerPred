@@ -164,7 +164,7 @@ def output_selected(select_list, lmdb_name):
                 if len(img_file_path)<=0:
                     continue
                 img = process_pipeline(img_file_path[0])
-                txn.put(key = str(id).encode(), value = img.tobytes(order='C'))
+                txn.put(key = str(f).encode(), value = img.tobytes(order='C'))
                 if args.verbose:
                     img_8u = convert_to_8bit(img)
                     cv2.imwrite(args.output_dir+'/'+lmdb_name+'_verbose/'+id+'.png',img_8u)
