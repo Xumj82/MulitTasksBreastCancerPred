@@ -10,6 +10,7 @@ from glob import glob
 from random import sample
 from argparse import ArgumentParser
 from lib.preprocess_utils import read_resize_img, segment_breast, horizontal_flip,convert_to_8bit,convert_to_16bit,crop_borders
+from sklearn.model_selection import train_test_split
 
 SEED = 32
 RESIZE = (1120, 896)
@@ -111,9 +112,18 @@ def main(verbose):
         select_cancer_cases = random.sample(cancer_exam,cancer_cases_amount)
         select_healthy_cases = random.sample(healthy_exam,healthy_cases_amount)
         select_case = select_cancer_cases+select_healthy_cases
-        output_selected(select_case, 'csaw_exam_lv_set')
+        miss_records = output_selected(select_case, 'csaw_exam_lv_set')
         df = pd.DataFrame(select_case,columns =['id','r_cc_view','r_mlo_view','l_cc_view','l_mlo_view','rad_time'])
-        df.to_csv(args.output_dir+'/exam_lv_csaw_set.csv', index=False)
+
+        df = df.drop(df[df['id'].isin(miss_records)].index)
+
+
+        train_set, test_set = train_test_split(df, test_size=args.test_size, random_state=32)
+        train_set, val_set = train_test_split(train_set, test_size=args.test_size, random_state=32)
+
+        train_set.to_csv(args.output_dir+'/exam_lv_train_set.csv', index=False)
+        val_set.to_csv(args.output_dir+'/exam_lv_val_set.csv', index=False)
+        test_set.to_csv(args.output_dir+'/exam_lv_test_set.csv', index=False)
 
     if args.sample_level == 1:
         # total_cases_amount = len(cancer_breasts)+len(healthy_breasts)
@@ -123,33 +133,36 @@ def main(verbose):
         select_cancer_cases = random.sample(cancer_breasts,cancer_cases_amount)
         select_healthy_cases = random.sample(healthy_breasts,healthy_cases_amount)
         select_case = select_cancer_cases+select_healthy_cases
-        output_selected(select_case, 'csaw_breast_lv_set')
+        miss_records = output_selected(select_case, 'csaw_breast_lv_set')
         df = pd.DataFrame(select_case,columns =['id','cc_view','mlo_view','rad_time'])
-        df.to_csv(args.output_dir+'/breast_lv_csaw_set.csv', index=False)
-        # for p in selected_patients:
-        #     txn = env.begin(write=True) 
-        #     p_rows = csaw_df[csaw_df['anon_patientid']==p]
-        #     for idx,row in p_rows.iterrows():
-                
-        #         years = row['exam_year'].unique()
+        df = df.drop(df[df['id'].isin(miss_records)].index)
+        train_set, test_set = train_test_split(df, test_size=args.test_size, random_state=32)
+        train_set, val_set = train_test_split(train_set, test_size=args.test_size, random_state=32)
 
-        #         img_file_name = row['anon_filename']
-        #         img_file_path = glob(args.img_file_dir+'/*/'+img_file_name)
-        #         if len(img_file_path)<=0:
-        #             continue
-        #         img = process_pipeline(img_file_path[0])
-        #         txn.put(key = str(img_file_name).encode(), value = img.tobytes(order='C'))
-        #         if verbose:
-        #             img_8u = convert_to_8bit(img)
-        #             cv2.imwrite(args.output_dir+'/csaw_set_verbose/'+img_file_name.replace('dcm','png'),img_8u)
-        #         # pd.concat([patients_sample,row])
-        #     txn.commit() 
-        #     pbar.update(1)
-    # patients_sample = csaw_df[csaw_df['anon_patientid'].isin(selected_patients)]
-    # patients_sample.to_csv(args.output_dir+'/selected_csaw_set.csv', index=False)
-    
-    # env.close() 
+        train_set.to_csv(args.output_dir+'/breast_lv_train_set.csv', index=False)
+        val_set.to_csv(args.output_dir+'/breast_lv_val_set.csv', index=False)
+        test_set.to_csv(args.output_dir+'/breast_lv_test_set.csv', index=False)
+
+    if args.sample_level == 2:
+        # total_cases_amount = len(cancer_breasts)+len(healthy_breasts)
+        cancer_cases_amount = int(len(cancer_breasts)*args.sample_rate)
+        healthy_cases_amount = int(cancer_cases_amount/args.cancer_rate*(1-args.cancer_rate))
+
+        select_cancer_cases = random.sample(cancer_breasts,cancer_cases_amount)
+        select_healthy_cases = random.sample(healthy_breasts,healthy_cases_amount)
+        select_case = select_cancer_cases+select_healthy_cases
+        miss_records = output_selected(select_case, 'csaw_breast_lv_set')
+        df = pd.DataFrame(select_case,columns =['id','cc_view','mlo_view','rad_time'])
+        df = df.drop(df[df['id'].isin(miss_records)].index)
+        train_set, test_set = train_test_split(df, test_size=args.test_size, random_state=32)
+        train_set, val_set = train_test_split(train_set, test_size=args.test_size, random_state=32)
+
+        train_set.to_csv(args.output_dir+'/breast_lv_train_set.csv', index=False)
+        val_set.to_csv(args.output_dir+'/breast_lv_val_set.csv', index=False)
+        test_set.to_csv(args.output_dir+'/breast_lv_test_set.csv', index=False)
+
 def output_selected(select_list, lmdb_name):
+    miss_records = []
     if args.verbose:
         os.makedirs(args.output_dir+'/'+lmdb_name+'_verbose/', exist_ok=True)
     env = lmdb.open(args.output_dir+'/'+lmdb_name,map_size=1099511627776) 
@@ -159,20 +172,24 @@ def output_selected(select_list, lmdb_name):
             id = case[0]
             files = case[1:-1]
             label = case[-1]
+
             for f in files:
                 img_file_path = glob(args.img_file_dir+'/*/'+f)
                 if len(img_file_path)<=0:
+                    miss_records.append(id)
+                    print('{} not found, id :'.format(f, id))
                     continue
                 img = process_pipeline(img_file_path[0])
-                txn.put(key = str(id).encode(), value = img.tobytes(order='C'))
+                txn.put(key = str(f).encode(), value = img.tobytes(order='C'))
                 if args.verbose:
                     img_8u = convert_to_8bit(img)
-                    cv2.imwrite(args.output_dir+'/'+lmdb_name+'_verbose/'+id+'.png',img_8u)
+                    cv2.imwrite(args.output_dir+'/'+lmdb_name+'_verbose/'+f+'.png',img_8u)
                 # pd.concat([patients_sample,row])
             txn.commit() 
             pbar.update(1)
     
     env.close()
+    return miss_records
     # df = pd.DataFrame(select_list,columns =['Names'])
 if __name__ == '__main__':
    
@@ -187,7 +204,7 @@ if __name__ == '__main__':
         type=str)
     parser.add_argument('--sample_level',
         help='exam case level (0) or just breast level(1)',
-        default=0,
+        default=1,
         type=int)
     parser.add_argument('--sample_rate',
         help='from 0 to 1, how many cancar cases selected from the whole cancer cases',
@@ -195,7 +212,13 @@ if __name__ == '__main__':
     parser.add_argument('--cancer_rate',
         help='from 0 to 1, cancer rate in the whole selected dataset',
         default=0.5,type=int)
-    parser.add_argument('--output_dir',default='/mnt/nas4/diskl/MMG/Data/MMG-R1/AMPLE_DATA_EXAM/',type=str)
+    parser.add_argument('--test_size',
+        help='test size',
+        default=0.1,type=int)
+    parser.add_argument('--val_size',
+        help='valid size',
+        default=0.1,type=int)
+    parser.add_argument('--output_dir',default='/mnt/nas4/diskl/MMG/Data/MMG-R1/SAMPLE_DATA_BREAST/',type=str)
     parser.add_argument('--verbose',help='generate png file',default=True,type=bool)
     args = parser.parse_args()
 

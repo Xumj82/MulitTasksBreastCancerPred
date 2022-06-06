@@ -79,7 +79,7 @@ class ResNecks(BaseBackbone):
                  num_stages=2,
                  strides=(1, 2),
                  dilations=(1, 1),
-                 out_indices=(3, ),
+                 out_indices=(1, ),
                  style='pytorch',
                  deep_stem=False,
                  avg_down=False,

@@ -13,6 +13,7 @@ from mmdet.datasets.api_wrappers import COCO, COCOeval
 class CsawBreast(BaseDataset):
     # IMG_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif')
     def __init__(self,
+                 img_shape:tuple(),
                  data_prefix: str,
                  pipeline: Sequence = (),
                  seed:int=32,
@@ -20,7 +21,7 @@ class CsawBreast(BaseDataset):
                  ann_file: Optional[str] = None,
                  test_mode: bool = False,
                  file_client_args: Optional[dict] = None):
-        random.seed(seed)
+        self.img_shape = img_shape
         super().__init__(
             data_prefix=data_prefix,
             pipeline=pipeline,
@@ -37,7 +38,9 @@ class CsawBreast(BaseDataset):
             mlo_view = row['mlo_view']
             rad_time = row['rad_time']
             info = {'img_prefix': self.data_prefix}
+            info['img_id'] = row['id']
             info['img_info'] = {'cc_view':cc_view,'mlo_view':mlo_view}
             info['gt_label'] = np.array(rad_time-1, dtype=np.int64)
+            info['img_shape'] = self.img_shape
             data_infos.append(info)
         return data_infos
