@@ -4,6 +4,7 @@ import math
 import random
 from numbers import Number
 from typing import Sequence
+from cv2 import repeat
 
 import mmcv
 import numpy as np
@@ -884,20 +885,19 @@ class LinearNormalize(object):
             default is true.
     """
 
-    def __init__(self, max_val=65535, to_rgb=True, rep_dim=-1):
+    def __init__(self, max_val=65535,rep_dim=-1):
         self.max_val = max_val
-        self.to_rgb = to_rgb
+        # self.to_rgb = to_rgb
         self.rep_dim = rep_dim
 
     def __call__(self, results):
         for key in results.get('img_fields', ['img']):
             img = results[key]/self.max_val
-            if self.to_rgb:
-                img = np.expand_dims(img, axis=self.rep_dim)
-                img = np.repeat(img, 3, axis=self.rep_dim)
+            if self.rep_dim:
+                img= np.repeat(img, 3, axis=self.rep_dim)
             results[key] = img.astype(np.float32)
         results['img_norm_cfg'] = dict(
-            mean=0.4, std=0.2, to_rgb=self.to_rgb)
+            mean=0.4, std=0.2, to_rgb=True)
         return results
 
     def __repr__(self):
@@ -1175,21 +1175,45 @@ class Albu(object):
 
 @PIPELINES.register_module()
 class ElasticTransform:
-    def __init__(self,elas_prob=0.5,alpha=500,sigma=None,alpha_affin=None):
-
-        self.aug = albumentations.Compose([
-                    albumentations.ElasticTransform(
-                        alpha=alpha, 
-                        sigma=sigma if sigma else alpha*0.05 , 
-                        alpha_affine=alpha_affin if alpha_affin else alpha*0.05, 
-                        p=elas_prob),
-                    ]
-                )
+    def __init__(self,num_img= 1,elas_prob=0.5,alpha=500,sigma=None,alpha_affin=None):
+        if num_img == 1 :
+            self.aug = albumentations.Compose([
+                        albumentations.ElasticTransform(
+                            alpha=alpha, 
+                            sigma=sigma if sigma else alpha*0.05 , 
+                            alpha_affine=alpha_affin if alpha_affin else alpha*0.01, 
+                            p=elas_prob),
+                        ]
+                    )
+        else:
+            add_target = dict()
+            for i in range(num_img-1):
+                add_target['image'+str(i)]='image'
+            self.aug = albumentations.Compose([
+                        albumentations.ElasticTransform(
+                            alpha=alpha, 
+                            sigma=sigma if sigma else alpha*0.05 , 
+                            alpha_affine=alpha_affin if alpha_affin else alpha*0.05, 
+                            p=elas_prob),
+                        ],
+                        additional_targets=add_target
+                    )
 
     def __call__(self, results):
         import cv2
         for key in results.get('img_fields', ['img']):
             img = results[key]
-            augmented = self.aug(image=img)
-            results[key] = augmented['image']
+            if len(img.shape) != 3:
+                augmented = []
+                if img.shape[0] == 2:
+                    augmented=(self.aug(image=img[0], image0=img[1]))
+                if img.shape[0] == 4:
+                    augmented=(self.aug(image=img[0], image0=img[1],image1=img[2],image2=img[3]))
+                aug_list = [augmented['image']]
+                for i in range(img.shape[0]-1):
+                    aug_list.append(augmented['image'+str(i)])
+                results[key] = np.stack(aug_list, axis=0)              
+            else:
+                augmented = self.aug(image=img)
+                results[key] = augmented['image']
         return results

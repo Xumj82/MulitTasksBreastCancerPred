@@ -160,11 +160,13 @@ class LoadBreastImageFromFile:
     """
 
     def __init__(self,
+                 rep_dim = None,
                  img_label=False,
                  to_float32=False,
                  color_type='color',
                  channel_order='bgr',
                  file_client_args=dict(backend='lmdb')):
+        self.rep_dim = rep_dim
         self.img_label = img_label
         self.to_float32 = to_float32
         self.color_type = color_type
@@ -196,6 +198,8 @@ class LoadBreastImageFromFile:
         cc_img = cc_img.reshape(results['img_shape'])
         mlo_img = mlo_img.reshape(results['img_shape'])
         stack_img = np.stack([cc_img, mlo_img], axis=0)
+        if self.rep_dim:
+            stack_img = np.expand_dims(stack_img, axis=self.rep_dim)
         # img = cv2.imread(filename, cv2.IMREAD_ANYDEPTH)
         
         # img = img.astype(np.float32)

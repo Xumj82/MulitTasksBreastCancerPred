@@ -9,6 +9,7 @@ from tqdm import tqdm
 from glob import glob
 from random import sample
 from argparse import ArgumentParser
+from itertools import combinations
 from lib.preprocess_utils import read_resize_img, segment_breast, horizontal_flip,convert_to_8bit,convert_to_16bit,crop_borders
 from sklearn.model_selection import train_test_split
 
@@ -25,8 +26,7 @@ def process_pipeline(img_file_path):
             interpolation=cv2.INTER_CUBIC)
     img_resized = convert_to_16bit(img_resized).astype(np.uint16)
     return img_resized
-
-
+            
 
 def main(verbose):
     csaw_df = pd.read_csv(args.csv_file_path)
@@ -55,54 +55,110 @@ def main(verbose):
     cancer_exam = [] # ['id','r_cc_view','r_mlo_view','l_cc_view','l_mlo_view','rad_time']
     healthy_exam = [] # ['id','r_cc_view','r_mlo_view','l_cc_view','l_mlo_view','rad_time']
 
+    cancer_seq = [] 
+    # ['id','r_cc_view_0','r_mlo_view_0','l_cc_view_0','l_mlo_view_0','r_cc_view_1','r_mlo_view_1','l_cc_view_1','l_mlo_view_1','r_cc_view_2','r_mlo_view_2','l_cc_view_2','l_mlo_view_2','rad_time']
+    healthy_seq = []
+
     print('re-arrange annotation file')
     with tqdm(total=len(patients)) as pbar:
         for p in patients:
             p_rows = csaw_df[csaw_df['anon_patientid']==p]
 
             years = p_rows['exam_year'].unique()
-            for y in years:
-                y_rows = p_rows[p_rows['exam_year']==y]
-                right_cc_row = y_rows[(y_rows['imagelaterality']=='Right')&(y_rows['viewposition']=='CC')]
-                right_mlo_row = y_rows[(y_rows['imagelaterality']=='Right')&(y_rows['viewposition']=='MLO')]
-                right_gt_label = y_rows['rad_timing'].max() if y_rows['x_cancer_laterality'].iloc[0]=='Right' else 4.0
-                right_info = [str(p)+'_'+str(y)+'_'+'Right',
-                    right_cc_row.iloc[0]['anon_filename'],
-                    right_mlo_row.iloc[0]['anon_filename'],
-                    right_gt_label]
+            years = np.sort(years)
+            if args.sample_level != 2:
+                for y in years:
+                    y_rows = p_rows[p_rows['exam_year']==y]
+                    right_cc_row = y_rows[(y_rows['imagelaterality']=='Right')&(y_rows['viewposition']=='CC')]
+                    right_mlo_row = y_rows[(y_rows['imagelaterality']=='Right')&(y_rows['viewposition']=='MLO')]
+                    right_gt_label = y_rows['rad_timing'].max() if y_rows['x_cancer_laterality'].iloc[0]=='Right' else 4.0
+                    right_info = [str(p)+'_'+str(y)+'_'+'Right',
+                        right_cc_row.iloc[0]['anon_filename'],
+                        right_mlo_row.iloc[0]['anon_filename'],
+                        right_gt_label]
 
-                left_cc_row = y_rows[(y_rows['imagelaterality']=='Left')&(y_rows['viewposition']=='CC')]
-                left_mlo_row = y_rows[(y_rows['imagelaterality']=='Left')&(y_rows['viewposition']=='MLO')]
-                left_gt_label = y_rows['rad_timing'].max() if y_rows['x_cancer_laterality'].iloc[0]=='Left' else 4.0
-                left_info = [str(p)+'_'+str(y)+'_'+'Light',
-                    left_cc_row.iloc[0]['anon_filename'],
-                    left_mlo_row.iloc[0]['anon_filename'],
-                    left_gt_label]
+                    left_cc_row = y_rows[(y_rows['imagelaterality']=='Left')&(y_rows['viewposition']=='CC')]
+                    left_mlo_row = y_rows[(y_rows['imagelaterality']=='Left')&(y_rows['viewposition']=='MLO')]
+                    left_gt_label = y_rows['rad_timing'].max() if y_rows['x_cancer_laterality'].iloc[0]=='Left' else 4.0
+                    left_info = [str(p)+'_'+str(y)+'_'+'Light',
+                        left_cc_row.iloc[0]['anon_filename'],
+                        left_mlo_row.iloc[0]['anon_filename'],
+                        left_gt_label]
 
-                exam_gt_label = y_rows['rad_timing'].max()
-                exam_info = [str(p)+'_'+str(y),
-                    right_cc_row.iloc[0]['anon_filename'],
-                    right_mlo_row.iloc[0]['anon_filename'],
-                    left_cc_row.iloc[0]['anon_filename'],
-                    left_mlo_row.iloc[0]['anon_filename'],
-                    exam_gt_label]
+                    exam_gt_label = y_rows['rad_timing'].max()
+                    exam_info = [str(p)+'_'+str(y),
+                        right_cc_row.iloc[0]['anon_filename'],
+                        right_mlo_row.iloc[0]['anon_filename'],
+                        left_cc_row.iloc[0]['anon_filename'],
+                        left_mlo_row.iloc[0]['anon_filename'],
+                        exam_gt_label]
 
-                if right_gt_label == 4.0:
-                    healthy_breasts.append(right_info)
-                else:
-                    cancer_breasts.append(right_info)
-                
-                if left_gt_label == 4.0:
-                    healthy_breasts.append(left_info)
-                else:
-                    cancer_breasts.append(left_info)
+                    if right_gt_label == 4.0:
+                        healthy_breasts.append(right_info)
+                    else:
+                        cancer_breasts.append(right_info)
+                    
+                    if left_gt_label == 4.0:
+                        healthy_breasts.append(left_info)
+                    else:
+                        cancer_breasts.append(left_info)
 
-                if exam_gt_label == 4.0:
-                    healthy_exam.append(exam_info)
-                else:
-                    cancer_exam.append(exam_info)
-                    # files = [cc_row.iloc[0]['anon_filename'], mlo_row.iloc[0]['anon_filename']]
+                    if exam_gt_label == 4.0:
+                        healthy_exam.append(exam_info)
+                    else:
+                        cancer_exam.append(exam_info)
+                        # files = [cc_row.iloc[0]['anon_filename'], mlo_row.iloc[0]['anon_filename']]
+            
+            if len(years)>2 and args.sample_level == 2:
+                combs = [c for c in combinations(years,3)]
+                for idx,comb in enumerate(combs):
+                    y_0 = comb[0]
+                    y_1 = comb[1]
+                    y_2 = comb[2]
+
+                    right_cc_row_0 = p_rows[(p_rows['exam_year']==y_0)&(p_rows['imagelaterality']=='Right')&(p_rows['viewposition']=='CC')]
+                    right_mlo_row_0 = p_rows[(p_rows['exam_year']==y_0)&(p_rows['imagelaterality']=='Right')&(p_rows['viewposition']=='MLO')]
+                    left_cc_row_0 = p_rows[(p_rows['exam_year']==y_0)&(p_rows['imagelaterality']=='Left')&(p_rows['viewposition']=='CC')]
+                    left_mlo_row_0 = p_rows[(p_rows['exam_year']==y_0)&(p_rows['imagelaterality']=='Left')&(p_rows['viewposition']=='MLO')]
+
+                    right_cc_row_1 = p_rows[(p_rows['exam_year']==y_1)&(p_rows['imagelaterality']=='Right')&(p_rows['viewposition']=='CC')]
+                    right_mlo_row_1 = p_rows[(p_rows['exam_year']==y_1)&(p_rows['imagelaterality']=='Right')&(p_rows['viewposition']=='MLO')]
+                    left_cc_row_1 = p_rows[(p_rows['exam_year']==y_1)&(p_rows['imagelaterality']=='Left')&(p_rows['viewposition']=='CC')]
+                    left_mlo_row_1 = p_rows[(p_rows['exam_year']==y_1)&(p_rows['imagelaterality']=='Left')&(p_rows['viewposition']=='MLO')]
+
+                    right_cc_row_2 = p_rows[(p_rows['exam_year']==y_2)&(p_rows['imagelaterality']=='Right')&(p_rows['viewposition']=='CC')]
+                    right_mlo_row_2 = p_rows[(p_rows['exam_year']==y_2)&(p_rows['imagelaterality']=='Right')&(p_rows['viewposition']=='MLO')]
+                    left_cc_row_2 = p_rows[(p_rows['exam_year']==y_2)&(p_rows['imagelaterality']=='Left')&(p_rows['viewposition']=='CC')]
+                    left_mlo_row_2 = p_rows[(p_rows['exam_year']==y_2)&(p_rows['imagelaterality']=='Left')&(p_rows['viewposition']=='MLO')]
+
+                    rad_time_0 = p_rows[(p_rows['exam_year']==y_0)]['rad_timing'].min()
+                    rad_time_1 = p_rows[(p_rows['exam_year']==y_1)]['rad_timing'].min()
+                    rad_time_2 = p_rows[(p_rows['exam_year']==y_2)]['rad_timing'].min()
+
+                    seq_info = [
+                        str(p)+'_'+str(idx),
+                        right_cc_row_0.iloc[0]['anon_filename'],
+                        right_mlo_row_0.iloc[0]['anon_filename'],
+                        left_cc_row_0.iloc[0]['anon_filename'],
+                        left_mlo_row_0.iloc[0]['anon_filename'],
+                        right_cc_row_1.iloc[0]['anon_filename'],
+                        right_mlo_row_1.iloc[0]['anon_filename'],
+                        left_cc_row_1.iloc[0]['anon_filename'],
+                        left_mlo_row_1.iloc[0]['anon_filename'],
+                        right_cc_row_2.iloc[0]['anon_filename'],
+                        right_mlo_row_2.iloc[0]['anon_filename'],
+                        left_cc_row_2.iloc[0]['anon_filename'],
+                        left_mlo_row_2.iloc[0]['anon_filename'],
+                        '{}/{}/{}'.format(rad_time_0,rad_time_1,rad_time_2),
+                    ]
+                    if rad_time_2 >3:
+                        healthy_seq.append(seq_info)
+                    else:
+                        cancer_seq.append(seq_info)
+
             pbar.update(1)
+
+    
 
     if args.sample_level == 0:
         # total_cases_amount = len(cancer_exam)+len(healthy_exam)
@@ -145,21 +201,21 @@ def main(verbose):
 
     if args.sample_level == 2:
         # total_cases_amount = len(cancer_breasts)+len(healthy_breasts)
-        cancer_cases_amount = int(len(cancer_breasts)*args.sample_rate)
+        cancer_cases_amount = int(len(cancer_seq)*args.sample_rate)
         healthy_cases_amount = int(cancer_cases_amount/args.cancer_rate*(1-args.cancer_rate))
 
-        select_cancer_cases = random.sample(cancer_breasts,cancer_cases_amount)
-        select_healthy_cases = random.sample(healthy_breasts,healthy_cases_amount)
+        select_cancer_cases = random.sample(cancer_seq,cancer_cases_amount)
+        select_healthy_cases = random.sample(healthy_seq,healthy_cases_amount)
         select_case = select_cancer_cases+select_healthy_cases
-        miss_records = output_selected(select_case, 'csaw_breast_lv_set')
+        miss_records = output_selected(select_case, 'csaw_seq_lv_set')
         df = pd.DataFrame(select_case,columns =['id','cc_view','mlo_view','rad_time'])
         df = df.drop(df[df['id'].isin(miss_records)].index)
         train_set, test_set = train_test_split(df, test_size=args.test_size, random_state=32)
         train_set, val_set = train_test_split(train_set, test_size=args.test_size, random_state=32)
 
-        train_set.to_csv(args.output_dir+'/breast_lv_train_set.csv', index=False)
-        val_set.to_csv(args.output_dir+'/breast_lv_val_set.csv', index=False)
-        test_set.to_csv(args.output_dir+'/breast_lv_test_set.csv', index=False)
+        train_set.to_csv(args.output_dir+'/seq_lv_train_set.csv', index=False)
+        val_set.to_csv(args.output_dir+'/seq_lv_val_set.csv', index=False)
+        test_set.to_csv(args.output_dir+'/seq_lv_test_set.csv', index=False)
 
 def output_selected(select_list, lmdb_name):
     miss_records = []
@@ -180,7 +236,8 @@ def output_selected(select_list, lmdb_name):
                     print('{} not found, id :'.format(f, id))
                     continue
                 img = process_pipeline(img_file_path[0])
-                txn.put(key = str(f).encode(), value = img.tobytes(order='C'))
+                if txn.get(str(f).encode()) is None:
+                    txn.put(key = str(f).encode(), value = img.tobytes(order='C'))
                 if args.verbose:
                     img_8u = convert_to_8bit(img)
                     cv2.imwrite(args.output_dir+'/'+lmdb_name+'_verbose/'+f+'.png',img_8u)
@@ -203,23 +260,23 @@ if __name__ == '__main__':
         default='/mnt/nas4/diskl/MMG/Data/MMG-R1/CSAW_1/anon_dataset_nonhidden_211125.csv',
         type=str)
     parser.add_argument('--sample_level',
-        help='exam case level (0) or just breast level(1)',
-        default=1,
+        help='exam case level (0) or breast level(1) or patient level(2)',
+        default=2,
         type=int)
     parser.add_argument('--sample_rate',
         help='from 0 to 1, how many cancar cases selected from the whole cancer cases',
         default=1,type=int)
     parser.add_argument('--cancer_rate',
         help='from 0 to 1, cancer rate in the whole selected dataset',
-        default=0.5,type=int)
+        default=0.8,type=int)
     parser.add_argument('--test_size',
         help='test size',
         default=0.1,type=int)
     parser.add_argument('--val_size',
         help='valid size',
         default=0.1,type=int)
-    parser.add_argument('--output_dir',default='/mnt/nas4/diskl/MMG/Data/MMG-R1/SAMPLE_DATA_BREAST/',type=str)
-    parser.add_argument('--verbose',help='generate png file',default=True,type=bool)
+    parser.add_argument('--output_dir',default='/home/xumingjie/Desktop/CSAW_SEQ/',type=str)
+    parser.add_argument('--verbose',help='generate png file',default=False,type=bool)
     args = parser.parse_args()
 
     main(args.verbose)
