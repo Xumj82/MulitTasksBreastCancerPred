@@ -65,6 +65,22 @@ class ImageToTensor(object):
     def __repr__(self):
         return self.__class__.__name__ + f'(keys={self.keys})'
 
+@PIPELINES.register_module()
+class DuoViewImageToTensor(object):
+
+    def __init__(self, keys):
+        self.keys = keys
+
+    def __call__(self, results):
+        for key in self.keys:
+            img = results[key]
+            if len(img.shape) < 4:
+                img = np.expand_dims(img, -1)
+            results[key] = to_tensor(img.transpose(0,3,1,2))
+        return results
+
+    def __repr__(self):
+        return self.__class__.__name__ + f'(keys={self.keys})'
 
 @PIPELINES.register_module()
 class Transpose(object):

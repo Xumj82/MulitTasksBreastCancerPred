@@ -40,7 +40,10 @@ class CsawBreast(BaseDataset):
             info = {'img_prefix': self.data_prefix}
             info['img_id'] = row['id']
             info['img_info'] = {'cc_view':cc_view,'mlo_view':mlo_view}
-            info['gt_label'] = np.array(rad_time-1, dtype=np.int64)
+            if self.CLASSES == 4:
+                info['gt_label'] = np.array(rad_time-1, dtype=np.int64)
+            else:
+                info['gt_label'] = 1 if rad_time <=3 else 0
             info['img_shape'] = self.img_shape
             data_infos.append(info)
         return data_infos

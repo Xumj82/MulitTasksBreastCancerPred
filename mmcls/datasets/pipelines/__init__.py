@@ -4,7 +4,7 @@ from .auto_augment import (AutoAugment, AutoContrast, Brightness,
                            Posterize, RandAugment, Rotate, Sharpness, Shear,
                            Solarize, SolarizeAdd, Translate)
 from .compose import Compose
-from .formatting import (Collect, ImageToTensor, ToNumpy, ToPIL, ToTensor,
+from .formatting import (Collect, ImageToTensor, ToNumpy, ToPIL, ToTensor,DuoViewImageToTensor,
                          Transpose, to_tensor)
 from .loading import LoadImageFromFile,LoadMMImageFromFile
 from .transforms import (CenterCrop, ColorJitter, Lighting, Normalize, Pad,
@@ -13,7 +13,7 @@ from .transforms import (CenterCrop, ColorJitter, Lighting, Normalize, Pad,
 __all__ = [
     'Compose', 'to_tensor', 'ToTensor', 'ImageToTensor', 'ToPIL', 'ToNumpy',
     'Transpose', 'Collect', 'LoadImageFromFile', 'Resize', 'CenterCrop','LoadMMImageFromFile','LinearNormalize'
-    'RandomFlip', 'Normalize', 'RandomCrop', 'RandomResizedCrop',
+    'RandomFlip', 'Normalize', 'RandomCrop', 'RandomResizedCrop','DuoViewImageToTensor',
     'RandomGrayscale', 'Shear', 'Translate', 'Rotate', 'Invert',
     'ColorTransform', 'Solarize', 'Posterize', 'AutoContrast', 'Equalize',
     'Contrast', 'Brightness', 'Sharpness', 'AutoAugment', 'SolarizeAdd',
