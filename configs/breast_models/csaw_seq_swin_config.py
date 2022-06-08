@@ -43,7 +43,7 @@ test_pipeline = [
 ]
 data = dict(
     samples_per_gpu=2,
-    workers_per_gpu=14,
+    workers_per_gpu=6,
     train=dict(
         classes=classes,
         type=dataset_type,
@@ -63,7 +63,7 @@ data = dict(
         classes=classes, 
         type=dataset_type,
         data_prefix=data_root+'csaw_seq_lv_set/',
-        ann_file=data_root+'seq_lv_test_set_.csv',
+        ann_file=data_root+'seq_lv_val_set_.csv',
         pipeline=test_pipeline))
 checkpoint_config = dict(interval=10)
 log_config = dict(
