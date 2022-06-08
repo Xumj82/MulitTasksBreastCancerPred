@@ -21,7 +21,10 @@ def process_pipeline(img_file_path):
     img = read_resize_img(img_file_path, )
     img = crop_borders(img,border_size=(0,0,0.06,0.06,))
     img_segment,_,breast_mask = segment_breast(img)
-    img_filped = horizontal_flip(img_segment,breast_mask)
+    if horizontal_flip(breast_mask):
+        img_filped = cv2.flip(img_segment, 1)
+    else:
+        img_filped = cv2.flip(img_segment, 1)
     img_resized = cv2.resize(img_filped,dsize=(target_width, target_height), 
             interpolation=cv2.INTER_CUBIC)
     img_resized = convert_to_16bit(img_resized).astype(np.uint16)

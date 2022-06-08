@@ -1,9 +1,11 @@
 import torch
-from torch import nn, einsum
+from torch import nn, einsum, nuclear_norm
 import torch.nn.functional as F
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 import numpy as np
+from ..builder import NECKS
+from .gap import GlobalAveragePooling
 
 class Residual(nn.Module):
     def __init__(self, fn):
@@ -82,9 +84,9 @@ class Transformer(nn.Module):
         return self.norm(x)
 
 
-  
-class ViViT(nn.Module):
-    def __init__(self, dim = 192, depth = 4, heads = 3, pool = 'cls', dim_head = 64, dropout = 0.,
+@NECKS.register_module()
+class ViVit(nn.Module):
+    def __init__(self,  num_frames = 3, dim = 768, depth = 4, heads = 3, pool = 'cls', dim_head = 64, dropout = 0.,
                  emb_dropout = 0., scale_dim = 4, ):
         super().__init__()
         
@@ -102,7 +104,8 @@ class ViViT(nn.Module):
         # self.pos_embedding = nn.Parameter(torch.randn(1, num_frames, num_patches + 1, dim))
         # self.space_token = nn.Parameter(torch.randn(1, 1, dim))
         # self.space_transformer = Transformer(dim, depth, heads, dim_head, dim*scale_dim, dropout)
-
+        self.gap = GlobalAveragePooling()
+        self.num_frames = 3
         self.temporal_token = nn.Parameter(torch.randn(1, 1, dim))
         self.temporal_transformer = Transformer(dim, depth, heads, dim_head, dim*scale_dim, dropout)
 
@@ -116,8 +119,9 @@ class ViViT(nn.Module):
 
     def forward(self, x):
         # x = self.to_patch_embedding(x)
-        b, t, n, _ = x.shape
-
+        x = self.gap(x[0])
+        b, n = x.shape
+        x = x.reshape(b//self.num_frames, self.num_frames,n)
         # cls_space_tokens = repeat(self.space_token, '() n d -> b t n d', b = b, t=t)
         # x = torch.cat((cls_space_tokens, x), dim=2)
         # x += self.pos_embedding[:, :, :(n + 1)]
@@ -127,7 +131,7 @@ class ViViT(nn.Module):
         # x = self.space_transformer(x)
         # x = rearrange(x[:, 0], '(b t) ... -> b t ...', b=b)
 
-        cls_temporal_tokens = repeat(self.temporal_token, '() n d -> b n d', b=b)
+        cls_temporal_tokens = repeat(self.temporal_token, '() n d -> b n d', b=b//self.num_frames)
         x = torch.cat((cls_temporal_tokens, x), dim=1)
 
         x = self.temporal_transformer(x)

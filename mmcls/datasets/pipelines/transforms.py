@@ -693,19 +693,19 @@ class Resize(object):
                  interpolation='bilinear',
                  adaptive_side='short',
                  backend='cv2'):
-        assert isinstance(size, int) or (isinstance(size, tuple)
-                                         and len(size) == 2)
+        # assert isinstance(size, int) or (isinstance(size, tuple)
+        #                                  and len(size) == 2)
         assert adaptive_side in {'short', 'long', 'height', 'width'}
 
         self.adaptive_side = adaptive_side
         self.adaptive_resize = False
-        if isinstance(size, int):
-            assert size > 0
-            size = (size, size)
-        else:
-            assert size[0] > 0 and (size[1] > 0 or size[1] == -1)
-            if size[1] == -1:
-                self.adaptive_resize = True
+        # if isinstance(size, int):
+        #     assert size > 0
+        #     size = (size, size)
+        # else:
+        #     assert size[0] > 0 and (size[1] > 0 or size[1] == -1)
+        #     if size[1] == -1:
+        #         self.adaptive_resize = True
         if backend not in ['cv2', 'pillow']:
             raise ValueError(f'backend: {backend} is not supported for resize.'
                              'Supported backends are "cv2", "pillow"')
@@ -747,16 +747,27 @@ class Resize(object):
                     height = target_size
                     width = int(target_size * w / h)
             else:
-                height, width = self.size
+                height, width,_ = self.size
             if not ignore_resize:
-                img = mmcv.imresize(
-                    img,
-                    size=(width, height),
-                    interpolation=self.interpolation,
-                    return_scale=False,
-                    backend=self.backend)
-                results[key] = img
-                results['img_shape'] = img.shape
+                if len(img.shape)>3:
+                    for idx, im in enumerate(img):
+                        img[idx] = mmcv.imresize(
+                            im,
+                            size=self.size,
+                            interpolation=self.interpolation,
+                            return_scale=False,
+                            backend=self.backend)
+                    results[key] = img
+                    results['img_shape'] = img.shape
+                else:
+                    img = mmcv.imresize(
+                        img,
+                        size=(width, height),
+                        interpolation=self.interpolation,
+                        return_scale=False,
+                        backend=self.backend)
+                    results[key] = img
+                    results['img_shape'] = img.shape
 
     def __call__(self, results):
         self._resize_img(results)

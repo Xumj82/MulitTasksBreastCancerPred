@@ -412,6 +412,9 @@ class SwinTransformer(BaseBackbone):
             trunc_normal_(self.absolute_pos_embed, std=0.02)
 
     def forward(self, x):
+        if len(x.shape)>4:
+            org_shape = x.shape
+            x = x.reshape((-1,)+x.shape[2:])
         x, hw_shape = self.patch_embed(x)
         if self.use_abs_pos_embed:
             x = x + resize_pos_embed(

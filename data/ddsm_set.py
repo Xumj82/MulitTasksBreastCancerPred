@@ -55,26 +55,6 @@ class DdsmSet(Dataset):
                 return 2
         return 0
 
-    def init_dataset_stat(self):
-        self.env = None
-        self.txn = None
-        self.psum = 0
-        self.psum_sq = 0
-        self.pmax = 0
-        self.pmin = 65535
-    
-    def update_dataset_stat(self, full_img_segment):
-        self.psum    += full_img_segment.sum()
-        self.psum_sq += (full_img_segment ** 2).sum()
-        self.pmax = max(self.pmax, full_img_segment.max())
-        self.pmin = min(self.pmax, full_img_segment.min())
-
-    def get_dataset_stat(self):
-        count = len(self) * self.target_size[0] * self.target_size[1]
-        total_mean = self.psum / count
-        total_var  = (self.psum_sq / count) - (total_mean ** 2)
-        total_std  = np.sqrt(total_var)
-        return total_mean, total_var, total_std, self.pmax, self.pmin
 
     def __getitem__(self, idx):
         full_img_path = self.full_images[idx]
