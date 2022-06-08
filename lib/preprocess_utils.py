@@ -228,7 +228,7 @@ def crop_borders(img,border_size=(0.01,0.04,0.01,0.04)):
     
     return cropped_img
 
-def horizontal_flip(img, mask):
+def horizontal_flip(mask):
     
     '''
     This function figures out how to flip (also entails whether
@@ -266,9 +266,8 @@ def horizontal_flip(img, mask):
     bottom_sum = sum(row_sum[y_center:-1])
     
     if left_sum < right_sum:
-        img = cv2.flip(img, 1)
-
-    return img
+        return True
+    return False
 
 def generate_new_meta():
     calc_train = pd.read_csv('csv/calc_case_description_train_set.csv')

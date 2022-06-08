@@ -7,7 +7,6 @@ from typing import Optional, Sequence, Union
 from torch import rand
 from .builder import DATASETS
 from .base_dataset import BaseDataset
-from mmdet.datasets.api_wrappers import COCO, COCOeval
 
 @DATASETS.register_module()
 class CsawBreast(BaseDataset):
@@ -34,8 +33,8 @@ class CsawBreast(BaseDataset):
         data_infos = []
         df = pd.read_csv(self.ann_file)
         for idx,row in df.iterrows():
-            cc_view = row['cc_view']
-            mlo_view = row['mlo_view']
+            cc_view = row['id']
+            mlo_view = row['id']
             rad_time = row['rad_time']
             info = {'img_prefix': self.data_prefix}
             info['img_id'] = row['id']

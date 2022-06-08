@@ -14,7 +14,7 @@ from torch.utils.data import Dataset
 
 from tqdm import tqdm
 from lib.preprocess_utils import read_resize_img,segment_breast,crop_img,add_img_margins,get_max_connected_area,get_candidate_patch,draw_rect,overlap_patch_roi
-from lib.preprocess_utils import convert_to_8bit, show_img_cv,crop_borders,convert_to_16bit
+from lib.preprocess_utils import convert_to_8bit, show_img_cv,crop_borders,convert_to_16bit,clahe
 
 class PatchSet(Dataset):
     def __init__(self, img_dir, roi_df, 
@@ -53,10 +53,13 @@ class PatchSet(Dataset):
         full_img_path = self.full_images[idx]
         img_id = full_img_path.split('/')[1][:-4]
         lesions = self.roi_df[self.roi_df['image file path']==full_img_path]
-        full_img = read_resize_img(path.join(self.img_dir,full_img_path), target_size =self.target_size,gs_255=self.gs_255)
+        full_img = read_resize_img(path.join(self.img_dir,full_img_path),gs_255=self.gs_255).astype(np.float32)
         full_img = crop_borders(full_img, border_size=(0,0,0.1,0.1))
         # show_img_cv(full_img, title=full_img_path)
         full_img,bbox,_ = segment_breast(full_img)
+        full_img = cv2.resize(full_img,(self.target_size[1],self.target_size[0]))
+        full_img = clahe(full_img, max_pixel_val=65535)
+        full_img = convert_to_16bit(full_img)
         img = add_img_margins(full_img, self.patch_size//2+self.jitter)
         full_mask = np.zeros(img.shape)
         roi_areas = []
@@ -68,9 +71,10 @@ class PatchSet(Dataset):
 
             roi_area = {}
 
-            mask_img =read_resize_img(path.join(self.img_dir,mask), target_size =self.target_size,gs_255=True)
+            mask_img =read_resize_img(path.join(self.img_dir,mask),gs_255=True)
             mask_img =crop_borders(mask_img, border_size=(0,0,0.1,0.1))
             mask_img = crop_img(mask_img,bbox) 
+            mask_img = cv2.resize(mask_img,(self.target_size[1],self.target_size[0]))
             roi_mask = add_img_margins(mask_img, self.patch_size//2+self.jitter)
 
             idx,cont_areas,contours = get_max_connected_area(roi_mask)
