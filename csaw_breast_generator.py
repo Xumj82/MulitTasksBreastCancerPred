@@ -158,8 +158,6 @@ def main(verbose):
 
             pbar.update(1)
 
-    
-
     if args.sample_level == 0:
         # total_cases_amount = len(cancer_exam)+len(healthy_exam)
         cancer_cases_amount = int(len(cancer_exam)*args.sample_rate)
