@@ -13,6 +13,9 @@ from argparse import ArgumentParser
 from lib.preprocess_utils import read_resize_img, segment_breast, horizontal_flip,convert_to_8bit,convert_to_16bit,crop_borders,clahe,crop_img
 from sklearn.model_selection import train_test_split
 
+RESIZE = (1120, 896)
+MAX_PIXEL_VAL= 65535
+
 def one_hot(type,pathology,pathology_display = True):
     if pathology=='MALIGNANT':
         if type == 'calcification':
@@ -26,87 +29,68 @@ def one_hot(type,pathology,pathology_display = True):
             return 2
     return 0
 
+def get_duo_view(p_row):
+    cc_views = p_row[p_row['image view']=='CC']
+    mlo_views = p_row[p_row['image view']=='MLO']
+    if len(cc_views) >0 and len(mlo_views)>0:
+        cc_view = cc_views.iloc[0]
+        mlo_view = mlo_views.iloc[0]
+        return [cc_view['patient_id'],
+        cc_view['image file path'].replace('full_mammogram_images/',''),
+        mlo_view['image file path'].replace('full_mammogram_images/',''),
+        cc_view['abnormality type'],
+        cc_view['pathology']]
+    return None
+
+def process_pipeline(img_file_path):
+    target_height, target_width = RESIZE
+    img = read_resize_img(img_file_path, )
+    img = crop_borders(img,border_size=(0,0,0.06,0.06,))
+    img_segment,_,breast_mask = segment_breast(img)
+    if horizontal_flip(breast_mask):
+        img_filped = cv2.flip(img_segment, 1)
+    else:
+        img_filped = img_segment
+    img_resized = cv2.resize(img_filped,dsize=(target_width, target_height), 
+            interpolation=cv2.INTER_CUBIC)
+    img_clahe = clahe(img_resized, max_pixel_val=MAX_PIXEL_VAL)
+
+    img_clahe = convert_to_16bit(img_clahe).astype(np.uint16)
+    return img_clahe
+
+
 def main():
     roi_df =pd.read_csv(args.csv_file)
     full_images = roi_df['image file path'].copy().drop_duplicates().to_numpy()
-    crop_board_size = (0,0,0.1,0.1)
-    max_pixel_val = 65535
-    target_height,target_width = (1120, 896)
+    patients = roi_df['patient_id'].unique().tolist()
+    duo_view_list = []
+    print('re-arrage breast data...')
+    with tqdm(total=len(patients)) as pbar:
+        for p in patients:
+            p_row_right = roi_df[(roi_df['patient_id']==p)&(roi_df['left or right breast']=='RIGHT')]
+            p_row_left = roi_df[(roi_df['patient_id']==p)&(roi_df['left or right breast']=='LEFT')]
+
+            rigth_views = get_duo_view(p_row_right)
+            if rigth_views:
+                duo_view_list.append(rigth_views)
+            
+            left_views = get_duo_view(p_row_left)
+            if left_views:
+                duo_view_list.append(left_views)
+
+            pbar.update(1)
+
+    df = pd.DataFrame(duo_view_list, columns =['patient_id', 'cc_view','mlo_view','type','pathology'])
+
+    # df.to_csv(args.output_dir+'/seq_lv_train_set.csv',index=False)
+
     env = lmdb.open(args.output_dir+'/ddsm_breast',map_size=1099511627776) 
     
-
     if args.verbose:
         os.makedirs(args.output_dir+'/ddsm_breast_verbose/', exist_ok=True)
 
-
-    img_list = []
-
-    with tqdm(total=len(full_images)) as pbar:
-        for full_img_path in full_images:
-            txn = env.begin(write=True) 
-            img_id = full_img_path.split('/')[1][:-4]
-            lesions = roi_df[roi_df['image file path']==full_img_path]
-            pathology_global = False
-
-            full_img = read_resize_img(path.join(args.img_dir,full_img_path),gs_255=True).astype(np.float32)
-            full_img = crop_borders(full_img, border_size=crop_board_size)
-            full_img,bbox,breast_mask = segment_breast(full_img)
-            full_img_org = full_img
-
-            full_img_org = cv2.resize(full_img_org,dsize=(target_width, target_height))
-            full_img = cv2.resize(full_img,dsize=(target_width, target_height))
-
-            full_img = clahe(full_img, max_pixel_val=max_pixel_val)
-
-
-            # full_images = np.clip(full_img,a_min=max_pixel_val*0.05, a_max=max_pixel_val*0.95)
-            
-            full_mask = np.zeros(full_img.shape)
-            roi_areas = []
-
-            for idx,lesion in lesions.iterrows():
-                mask = lesion['ROI mask file path']
-                type = lesion['abnormality type']
-                pathology = lesion['pathology']
-                if pathology == 'MALIGNANT':
-                    pathology_global = True
-
-                ann_code = one_hot(type, pathology, True)
-                roi_area = {}
-
-                mask_img = read_resize_img(path.join(args.img_dir,mask), gs_255=False)
-                mask_img = crop_borders(mask_img, border_size=(0,0,0.1,0.1))
-                mask_img = crop_img(mask_img,bbox) 
-                mask_img = cv2.resize(mask_img,dsize=(target_width, target_height))
-                full_mask = np.where(mask_img>0,ann_code,full_mask)  
-
-            if horizontal_flip(breast_mask):
-                full_img_org = cv2.flip(full_img_org, 1)
-                full_img = cv2.flip(full_img, 1)
-                full_mask = cv2.flip(full_mask, 1)
-
-            full_img = convert_to_16bit(full_img).astype(np.uint16)
-            full_mask = full_mask.astype(np.uint8)
-
-            txn.put(key = str(img_id).encode(), value = full_img.tobytes(order='C'))
-            txn.put(key = str(img_id+'_mask').encode(), value = full_mask.tobytes(order='C'))
-            if args.verbose:
-                os.makedirs(args.output_dir+'/ddsm_breast_verbose/{}'.format(str(img_id)), exist_ok=True)
-                cv2.imwrite(args.output_dir+'/ddsm_breast_verbose/{}/{}.png'.format(str(img_id),'org'),convert_to_8bit(full_img_org).astype(np.uint8))
-                cv2.imwrite(args.output_dir+'/ddsm_breast_verbose/{}/{}.png'.format(str(img_id),'img'),convert_to_8bit(full_img).astype(np.uint8))
-                cv2.imwrite(args.output_dir+'/ddsm_breast_verbose/{}/{}.png'.format(str(img_id),'mask'), convert_to_8bit(full_mask).astype(np.uint8))
-
-            img_info = [
-                img_id, img_id+str('_mask'),pathology_global
-            ]
-            img_list.append(img_info)
-            txn.commit()
-            pbar.update(1)
-    
-    env.close()
-    df = pd.DataFrame(img_list,columns =['img_id','mask_id','label'])
     if args.val_size > 0:
-        train_set, test_set = train_test_split(df, test_size=args.test_size, random_state=32)
+        train_set, test_set = train_test_split(df, test_size=args.val_size, random_state=32)
         train_set.to_csv(args.output_dir+'/seq_lv_train_set.csv', index=False)
         test_set.to_csv(args.output_dir+'/seq_lv_val_set.csv', index=False)
     else:
@@ -129,7 +113,7 @@ if __name__ == '__main__':
         default=0.1,
         type=float)
     parser.add_argument('--verbose',
-        default=True,
+        default=False,
         type=bool)
     args = parser.parse_args()
 
