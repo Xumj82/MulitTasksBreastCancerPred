@@ -9,7 +9,7 @@ from .formatting import (Collect, ImageToTensor, ToNumpy, ToPIL, ToTensor,DuoVie
 from .loading import LoadImageFromFile,LoadMMImageFromFile,LoadBreastImageFromFile,LoadSeqImageFromFile
 from .transforms import (CenterCrop, ColorJitter, Lighting, Normalize, Pad,
                          RandomCrop, RandomErasing, RandomFlip,LinearNormalize,
-                         RandomGrayscale, RandomResizedCrop, Resize,ElasticTransform)
+                         RandomGrayscale, RandomResizedCrop, Resize,ElasticTransform,RepeatChannel)
 __all__ = [
     'Compose', 'to_tensor', 'ToTensor', 'ImageToTensor', 'ToPIL', 'ToNumpy',
     'Transpose', 'Collect', 'LoadImageFromFile', 'Resize', 'CenterCrop','LoadMMImageFromFile','LinearNormalize','LoadBreastImageFromFile',
@@ -17,5 +17,5 @@ __all__ = [
     'RandomGrayscale', 'Shear', 'Translate', 'Rotate', 'Invert','LoadSeqImageFromFile',
     'ColorTransform', 'Solarize', 'Posterize', 'AutoContrast', 'Equalize',
     'Contrast', 'Brightness', 'Sharpness', 'AutoAugment', 'SolarizeAdd',
-    'Cutout', 'RandAugment', 'Lighting', 'ColorJitter', 'RandomErasing', 'Pad','ElasticTransform'
+    'Cutout', 'RandAugment', 'Lighting', 'ColorJitter', 'RandomErasing', 'Pad','ElasticTransform','RepeatChannel'
 ]

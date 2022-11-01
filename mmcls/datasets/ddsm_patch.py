@@ -51,10 +51,13 @@ class DdsmPatch(BaseDataset):
 
         data_infos = []
         samples = pd.read_csv(self.ann_file)
+
+        # split data to train or test before load
         if self.split:
             train_sp, val_sp = self.train_test_split_on_patient(samples, test_size=self.val_size, random_state=self.random_state)
             samples = val_sp if self.test_mode else train_sp
 
+        # classes = ['bkg', 'calc','mass']
         if len(self.CLASSES) == 3:
             for patientid,img_id,patch_id,type,pathology,full_img,ROI_img in samples.values.tolist():
                 info = {'img_prefix': self.data_prefix}
@@ -68,6 +71,8 @@ class DdsmPatch(BaseDataset):
                 if type == 'mass':
                     info['gt_label'] = np.array(2, dtype=np.int64)
                 data_infos.append(info)
+                
+        # classes = ['bkg', 'calc mali','mass mali', 'calc beli', 'mass beli']
         if len(self.CLASSES) == 5:
             for patientid,img_id,patch_id,type,pathology,full_img,ROI_img in samples.values.tolist():
                 info = {'img_prefix': self.data_prefix}

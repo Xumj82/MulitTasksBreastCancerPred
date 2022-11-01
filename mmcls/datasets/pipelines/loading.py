@@ -118,6 +118,7 @@ class LoadMMImageFromFile:
 
         filename = results['img_info']['filename']
         img_bytes = self.file_client.get(filename)
+        assert img_bytes , "img file not existing'"
         img_np = np.frombuffer(img_bytes, np.uint16)
         img_np = img_np.reshape(results['img_shape'])
         # img_np = np.repeat(img_np[:, :, np.newaxis], 3, axis=2)/65535
@@ -187,7 +188,7 @@ class LoadBreastImageFromFile:
 
         if self.file_client is None:
             self.file_client = mmcv.FileClient(db_path = results['img_prefix'],**self.file_client_args)
-
+        
         cc_byte = self.file_client.get(results['img_info']['cc_view'])
         mlo_byte = self.file_client.get(results['img_info']['mlo_view'])
         

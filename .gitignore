@@ -15,3 +15,8 @@ staticis.txt
 checkpoints
 work_dirs
 logs
+mmcls/datasets/__pycache__/ddsm_patch.cpython-310.pyc
+mmcls/datasets/pipelines/__pycache__/__init__.cpython-310.pyc
+mmcls/datasets/pipelines/__pycache__/formatting.cpython-310.pyc
+mmcls/datasets/pipelines/__pycache__/loading.cpython-310.pyc
+mmcls/datasets/pipelines/__pycache__/transforms.cpython-310.pyc

@@ -8,6 +8,7 @@ from cv2 import repeat
 
 import mmcv
 import numpy as np
+import monai.transforms as T
 
 from ..builder import PIPELINES
 from .compose import Compose
@@ -896,16 +897,12 @@ class LinearNormalize(object):
             default is true.
     """
 
-    def __init__(self, max_val=65535,rep_dim=-1):
+    def __init__(self, max_val=65535):
         self.max_val = max_val
-        # self.to_rgb = to_rgb
-        self.rep_dim = rep_dim
 
     def __call__(self, results):
         for key in results.get('img_fields', ['img']):
             img = results[key]/self.max_val
-            if self.rep_dim:
-                img= np.repeat(img, 3, axis=self.rep_dim)
             results[key] = img.astype(np.float32)
         results['img_norm_cfg'] = dict(
             mean=0.4, std=0.2, to_rgb=True)
@@ -916,6 +913,33 @@ class LinearNormalize(object):
         repr_str += f'(mean={list(self.mean)}, '
         repr_str += f'std={list(self.std)}, '
         repr_str += f'to_rgb={self.to_rgb})'
+        return repr_str
+
+@PIPELINES.register_module()
+class RepeatChannel(object):
+    """Normalize the image.
+
+    Args:
+        mean (sequence): Mean values of 3 channels.
+        std (sequence): Std values of 3 channels.
+        to_rgb (bool): Whether to convert the image from BGR to RGB,
+            default is true.
+    """
+
+    def __init__(self,rep_num =3,rep_dim=0):
+        # self.to_rgb = to_rgb
+        self.rep_dim = rep_dim
+        self.rep_num = rep_num
+
+    def __call__(self, results):
+        for key in results.get('img_fields', ['img']):
+            img = results[key]
+            img= np.repeat(img[ np.newaxis,:, :], self.rep_num, axis=self.rep_dim)
+            results[key] = img.astype(np.float32)
+        return results
+
+    def __repr__(self):
+        repr_str = self.__class__.__name__
         return repr_str
 
 @PIPELINES.register_module()
@@ -1211,10 +1235,9 @@ class ElasticTransform:
                     )
 
     def __call__(self, results):
-        import cv2
         for key in results.get('img_fields', ['img']):
             img = results[key]
-            if len(img.shape) != 3:
+            if len(img.shape) == 3:
                 augmented = []
                 if img.shape[0] == 2:
                     augmented=(self.aug(image=img[0], image0=img[1]))
@@ -1228,3 +1251,140 @@ class ElasticTransform:
                 augmented = self.aug(image=img)
                 results[key] = augmented['image']
         return results
+
+@PIPELINES.register_module()
+class MinMaxNormalize(object):
+    """Normalize the image.
+
+    Args:
+        mean (sequence): Mean values of 3 channels.
+        std (sequence): Std values of 3 channels.
+        to_rgb (bool): Whether to convert the image from BGR to RGB,
+            default is true.
+    """
+    def __call__(self, img):
+        img = np.array(img)
+        img = img-img.min()
+        img = img/img.max()
+        return img
+
+    def __repr__(self):
+        repr_str = self.__class__.__name__
+        repr_str += f'max_val={self.max_val})'
+        return repr_str
+
+@PIPELINES.register_module()
+class RandRotate(object):
+    """Normalize the image.
+
+    Args:
+        mean (sequence): Mean values of 3 channels.
+        std (sequence): Std values of 3 channels.
+        to_rgb (bool): Whether to convert the image from BGR to RGB,
+            default is true.
+    """
+
+    def __init__(self,
+                 range,
+                 prob,
+                 ):
+        self.range = range
+        self.prob = prob
+        self.deform = T.RandRotate(
+            range_x = range,
+            prob = prob,
+        )
+
+    def __call__(self, img):
+        img = self.deform(img)
+        return img
+
+    def __repr__(self):
+        repr_str = self.__class__.__name__
+        # repr_str += f'range={self.range})'
+        # repr_str += f'prob={self.prob})'
+        return repr_str
+
+@PIPELINES.register_module()
+class RandAffine(object):
+    """Normalize the image.
+
+    Args:
+        mean (sequence): Mean values of 3 channels.
+        std (sequence): Std values of 3 channels.
+        to_rgb (bool): Whether to convert the image from BGR to RGB,
+            default is true.
+    """
+
+    def __init__(self,
+                 rotate_range,
+                 shear_range,
+                 translate_range,
+                 scale_range,
+                 spatial_size,
+                 prob,
+                 ):
+        self.range = range
+        self.prob = prob
+        self.deform = T.RandAffine(
+            rotate_range = rotate_range,
+            shear_range = shear_range,
+            translate_range = translate_range,
+            scale_range = scale_range,
+            spatial_size = spatial_size,
+            prob = prob
+        )
+
+    def __call__(self, img):
+        img = self.deform(img)
+        return img
+
+    def __repr__(self):
+        repr_str = self.__class__.__name__
+        # repr_str += f'range={self.range})'
+        # repr_str += f'prob={self.prob})'
+        return repr_str
+
+@PIPELINES.register_module()
+class Rand2DElastic(object):
+    """Normalize the image.
+
+    Args:
+        mean (sequence): Mean values of 3 channels.
+        std (sequence): Std values of 3 channels.
+        to_rgb (bool): Whether to convert the image from BGR to RGB,
+            default is true.
+    """
+
+    def __init__(self,
+                 spacing,
+                 magnitude_range,
+                 prob,
+                 rotate_range = None,
+                 shear_range= None,
+                 translate_range= None,
+                 scale_range= None,
+                 spatial_size= None,               
+                 ):
+        self.range = range
+        self.prob = prob
+        self.deform = T.Rand2DElastic(
+            spacing = spacing,
+            magnitude_range = magnitude_range,
+            rotate_range = rotate_range,
+            shear_range = shear_range,
+            translate_range = translate_range,
+            scale_range = scale_range,
+            spatial_size = spatial_size,
+            prob = prob
+        )
+
+    def __call__(self, img):
+        img = self.deform(img)
+        return img
+
+    def __repr__(self):
+        repr_str = self.__class__.__name__
+        # repr_str += f'range={self.range})'
+        # repr_str += f'prob={self.prob})'
+        return repr_str

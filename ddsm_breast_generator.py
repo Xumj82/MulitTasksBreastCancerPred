@@ -42,22 +42,58 @@ def get_duo_view(p_row):
         cc_view['pathology']]
     return None
 
-def process_pipeline(img_file_path):
+def process_pipeline(img_file_path, verbose_folder=None):
     target_height, target_width = RESIZE
     img = read_resize_img(img_file_path, )
+
+    if verbose_folder:
+        img_8u = convert_to_8bit(img)
+        cv2.imwrite(verbose_folder+'/origin.png',img_8u)
+
     img = crop_borders(img,border_size=(0,0,0.06,0.06,))
+
+    if verbose_folder:
+        img_8u = convert_to_8bit(img)
+        cv2.imwrite(verbose_folder+'/crop.png',img_8u)
+
     img_segment,_,breast_mask = segment_breast(img)
+
+    if verbose_folder:
+        img_8u = convert_to_8bit(img_segment)
+        cv2.imwrite(verbose_folder+'/segment.png',img_8u)
+
+
+    img_clahe = clahe(img_resized, max_pixel_val=MAX_PIXEL_VAL)
+
+    if verbose_folder:
+        img_8u = convert_to_8bit(img_clahe)
+        cv2.imwrite(verbose_folder+'/flip.png',img_8u)
+
     if horizontal_flip(breast_mask):
         img_filped = cv2.flip(img_segment, 1)
     else:
         img_filped = img_segment
-    img_resized = cv2.resize(img_filped,dsize=(target_width, target_height), 
-            interpolation=cv2.INTER_CUBIC)
-    img_clahe = clahe(img_resized, max_pixel_val=MAX_PIXEL_VAL)
+
+    if verbose_folder:
+        img_8u = convert_to_8bit(img_filped)
+        cv2.imwrite(verbose_folder+'/flip.png',img_8u)
 
     img_clahe = convert_to_16bit(img_clahe).astype(np.uint16)
+
+    img_resized = cv2.resize(img_filped,dsize=(target_width, target_height), 
+        interpolation=cv2.INTER_CUBIC)
+        
     return img_clahe
 
+def save_to_lmdb(df:pd.DataFrame):
+    env = lmdb.open(args.output_dir+'/ddsm_breast',map_size=1099511627776) 
+    for dix, row in df.iterrows():
+        if args.verbose:
+            os.makedirs(args.output_dir+'/ddsm_breast_verbose/'+row['patient_id']+'/', exist_ok=True)
+        cc_view = row['cc_view']
+        mlo_view = row['mlo_view']
+        cc_img = process_pipeline(cc_view)
+        mlo_img = process_pipeline(mlo_view)
 
 def main():
     roi_df =pd.read_csv(args.csv_file)
@@ -84,7 +120,7 @@ def main():
 
     # df.to_csv(args.output_dir+'/seq_lv_train_set.csv',index=False)
 
-    env = lmdb.open(args.output_dir+'/ddsm_breast',map_size=1099511627776) 
+   
     
     if args.verbose:
         os.makedirs(args.output_dir+'/ddsm_breast_verbose/', exist_ok=True)
